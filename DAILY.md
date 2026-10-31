@@ -118,11 +118,25 @@ Write the type in the history table's "Hazard bar" column, e.g. `STEALTH – DET
     loses links (`CHAIN 6 LINKS`) while he's stuck below (sticky floor, net, trapped foot)
     and has to wiggle free before it drops.
 
-**Outcomes: Gloop must NOT always win.** Aim for roughly **half wins, half fails** each day
-(3 videos → at least 1 fail, often 2; 10 videos → 4–6 fails), randomize which ones, and make
-some of them super close (0.1s left, 99% detected). Fails stay cartoony and non-gory
-(caught in a cage, frozen in an ice cube, swallowed and spat out dizzy, launched into the
-sky, covered in goo), header `GLOOP FAILED!`, the claw still collects him, same outro.
+**Outcomes: Gloop must NOT always win — and it must never look staged.**
+- **Let the simulation decide.** Every video runs a real sim: random-but-seeded events
+  (damage amounts, beam sweeps, threat attacks, Gloop's moves) drive the bar/% frame by
+  frame, and whatever happens at the end IS the outcome. Never hand-place "the rope snaps
+  exactly as the claw grabs him" or "100% at 0.1s". If the day's mix is off (e.g. all wins),
+  re-roll the **seed** and keep what the sim gives — don't edit the ending to force it.
+- Aim for roughly **half wins, half fails** each day (3 videos → 1–2 fails; 10 → 4–6).
+- **Vary the margins.** Wins: some comfortable (bar still 30–60%, timer ends calmly), some
+  medium, only occasionally a nail-biter. Fails: some early and sudden (a big unlucky hit at
+  9s), some mid-way, only occasionally at the very end. Max **1 in 5** videos may be decided
+  in the last second.
+- **No convenient coincidences.** The bar should never sit at 1–3% for ages, the threat
+  shouldn't conveniently miss at the last instant, and nothing breaks "just after" the
+  rescue. When Gloop wins, the claw just picks him up — the hazard stays intact.
+- Damage/detection must look consistent: same kind of hit = similar damage, rates don't
+  secretly change near the end.
+- Fails stay cartoony and non-gory (caught in a cage, frozen in an ice cube, swallowed and
+  spat out dizzy, launched into the sky, covered in goo), header `GLOOP FAILED!`, the claw
+  still collects him, same outro.
 
 ## The Gloop format (keep it consistent)
 
