@@ -12,13 +12,15 @@ For today's date in **Europe/Warsaw** (`TZ=Europe/Warsaw date +%F`):
 ```
 queue/YYYY-MM-DD/v1.mp4     # video 1
 queue/YYYY-MM-DD/v2.mp4     # video 2
-queue/YYYY-MM-DD/meta.json  # {"t1","d1","t2","d2","privacy"}
+queue/YYYY-MM-DD/meta.json  # {"t1","d1","t2","d2","publishAt"}
 ```
 
 - `meta.json` keys: `t1`/`t2` titles (max 100 chars, no `<` or `>`, end with `#shorts`),
   `d1`/`d2` descriptions (hook line, "New Gloop challenge every day at 12:00!",
   "See you next challenge 👋", then 6–8 hashtags incl. #shorts #gloop #survival #challenge),
-  `privacy`: `"public"`.
+  `publishAt`: today at 12:00 Warsaw time with the correct offset, e.g.
+  `"2026-10-31T12:00:00+01:00"` (offset from `TZ=Europe/Warsaw date +%:z`). Make uploads the
+  videos as scheduled and YouTube makes them public at that time (immediately if it's past).
 - Videos: 1080x1920, 30 fps, H.264 yuv420p, AAC, `-movflags +faststart`, **18–30 s**,
   **file size under 4.5 MB** (Make free plan limit is 5 MB; use `-crf 24`, raise if needed).
 - Must be on `main` and pushed **before 11:50 Warsaw time**.
