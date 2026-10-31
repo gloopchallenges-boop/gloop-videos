@@ -1,6 +1,0 @@
-{
-  "videos": [
-    {"file": "v1.mp4", "title": "TEST upload (delete me) #shorts", "description": "test", "publishAt": "2030-01-01T12:00:00+01:00"},
-    {"file": "missing.mp4", "title": "should be skipped", "description": "x", "publishAt": "2030-01-01T12:00:00+01:00"}
-  ]
-}

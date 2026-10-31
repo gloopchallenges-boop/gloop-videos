@@ -1,26 +1,48 @@
 # Gloop daily video job
 
-Every day two new Gloop survival Shorts are made and pushed to this repo. A Make.com
+Every day new Gloop survival Shorts are made and pushed to this repo. A Make.com
 scenario ("Gloop daily YouTube upload", runs 12:00 Europe/Warsaw) downloads them from
 `raw.githubusercontent.com` and uploads them to the Gloop YouTube channel.
 **Never edit the Make scenario from the daily job.** Only produce files.
+
+## How many videos
+
+- **Normal day: 3 videos** (minimum 3, never fewer unless something is broken).
+- **Special day: 10 videos**, all themed for the occasion (costumes, decorations, setting,
+  themed threats — e.g. Halloween: pumpkins, ghosts, haunted house, witch cauldron, skeleton
+  hands, bats; Christmas: chimney, Santa's sleigh, giant snowball, gingerbread trap…). Hook
+  and titles mention the occasion ("🎃 Halloween special").
+  Special days (Europe/Warsaw date): Oct 31 Halloween, Dec 24 Christmas Eve, Dec 25 Christmas,
+  Dec 31 New Year's Eve, Jan 1 New Year, Feb 14 Valentine's Day, Apr 1 April Fools,
+  Easter Sunday (compute it for the year).
+  On special days work fast: reuse one themed scene/engine and vary threat + hazard + action
+  + outcome per video so all 10 get done before the deadline.
 
 ## Output contract (what Make expects)
 
 For today's date in **Europe/Warsaw** (`TZ=Europe/Warsaw date +%F`):
 
 ```
-queue/YYYY-MM-DD/v1.mp4     # video 1
-queue/YYYY-MM-DD/v2.mp4     # video 2
-queue/YYYY-MM-DD/meta.json  # {"t1","d1","t2","d2","publishAt"}
+queue/YYYY-MM-DD/v1.mp4 ... vN.mp4
+queue/YYYY-MM-DD/meta.json
 ```
 
-- `meta.json` keys: `t1`/`t2` titles (max 100 chars, no `<` or `>`, end with `#shorts`),
-  `d1`/`d2` descriptions (hook line, "New Gloop challenge every day at 12:00!",
-  "See you next challenge 👋", then 6–8 hashtags incl. #shorts #gloop #survival #challenge),
-  `publishAt`: today at 12:00 Warsaw time with the correct offset, e.g.
-  `"2026-10-31T12:00:00+01:00"` (offset from `TZ=Europe/Warsaw date +%:z`). Make uploads the
-  videos as scheduled and YouTube makes them public at that time (immediately if it's past).
+`meta.json`:
+```json
+{"videos": [
+  {"file": "v1.mp4", "title": "...", "description": "...", "publishAt": "2026-10-31T12:00:00+01:00"},
+  ...
+]}
+```
+- `title`: max 100 chars, no `<` or `>`, ends with `#shorts`.
+- `description`: hook line, "New Gloop challenges every day at 12:00!",
+  "See you next challenge 👋", then 6–8 hashtags incl. #shorts #gloop #survival #challenge
+  (plus occasion hashtags on special days).
+- `publishAt`: Warsaw time with correct offset (`TZ=Europe/Warsaw date +%:z`).
+  Normal day: all videos `12:00`. Special day: stagger them hourly `12:00, 13:00 … 21:00`.
+  Make uploads everything at 12:00 as scheduled-private; YouTube publishes each at its time
+  (immediately if the time has passed).
+- Only list files that actually exist and finished correctly.
 - Videos: 1080x1920, 30 fps, H.264 yuv420p, AAC, `-movflags +faststart`, **18–30 s**,
   **file size under 4.5 MB** (Make free plan limit is 5 MB; use `-crf 24`, raise if needed).
 - Must be on `main` and pushed **before 11:50 Warsaw time**.
@@ -61,7 +83,7 @@ queue/YYYY-MM-DD/meta.json  # {"t1","d1","t2","d2","publishAt"}
      curl -sSL -o $f https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/$f; done
    ```
    Font: Poppins Bold (`fc-list | grep -i poppins`); if missing, use DejaVu Sans Bold.
-2. Read `history.md`. Pick 2 new challenges.
+2. Read `history.md`. Check if today is a special day. Pick 3 (or 10) new challenges.
 3. Copy `engine/examples/croc_rope_timer.py` as a starting point for each scenario,
    change the scene/threat/hazard/mechanic. Keep helpers (`draw_blob`, `text_center`,
    claw, header layout). Write each scenario's sfx script like
