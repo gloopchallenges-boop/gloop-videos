@@ -83,6 +83,9 @@ Write the type in the history table's "Hazard bar" column, e.g. `STEALTH – DET
    sometimes gets caught mid-move. Show an eye icon next to the bar that opens when he's
    seen, `!` popups when % jumps. 100% → `SPOTTED!` + alarm flash + cage drops / guard grabs
    him = fail. Timer runs out first = win → claw.
+   **Reference implementation: `engine/examples/stealth_flashlight.py` (+ `_sfx.py`)** — the
+   detection % is simulated from the real beam angle and Gloop's position, so tune the beam
+   keyframes/path and re-run the sim until the % curve tells the story you want.
 3. **RISING DANGER – climb/escape**: lava / water / slime / sand rises; `HEIGHT` or
    `AIR` meter; Gloop jumps platform to platform, some crumble.
 4. **DODGE – hearts**: falling anvils, saws, meteors, arrows; `❤❤❤` lives in the header
