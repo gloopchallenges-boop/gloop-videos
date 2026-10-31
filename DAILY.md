@@ -8,6 +8,14 @@ scenario ("Gloop daily YouTube upload", runs 12:00 Europe/Warsaw) downloads them
 ## How many videos
 
 - **Normal day: 3 videos** (minimum 3, never fewer unless something is broken).
+- **Launch period 2026-11-01 … 2026-11-14 (inclusive): 8 videos per day** instead of 3.
+  Not more: on Oct 31 YouTube rejected every upload after the 8th, and Make's error handler
+  hides that. Use the 8-video posting times below. From 2026-11-15 go back to 3/day.
+- **Carry-over:** if `queue/<today>/meta.json` already exists when the job starts (e.g. videos
+  that failed to upload yesterday were re-queued), KEEP those entries and files untouched,
+  number your new videos after them, and only make enough new ones to reach the day's total
+  (8 during the launch period, otherwise 3; 10 on special days).
+- **Special days cap: 8 videos** until the channel can upload more (same YouTube limit).
 - **Special day: 10 videos**, all themed for the occasion (costumes, decorations, setting,
   themed threats — e.g. Halloween: pumpkins, ghosts, haunted house, witch cauldron, skeleton
   hands, bats; Christmas: chimney, Santa's sleigh, giant snowball, gingerbread trap…). Hook
@@ -55,6 +63,7 @@ queue/YYYY-MM-DD/meta.json
   - Normal weekday: `12:00`, `18:00`, `21:00`.
   - Normal Sat/Sun: `14:00`, `18:00`, `21:00`.
   - Special day (10 videos): `12:00, 13:00, 14:00, 15:00, 16:00, 17:00, 18:00, 19:00, 20:00, 21:00`.
+  - 8 videos (launch period / capped special day): `12:00, 13:00, 14:00, 16:00, 17:00, 18:00, 20:00, 21:00`.
   - If there are extra videos, add `16:00` and `23:00`.
   Make uploads everything at 12:00 as scheduled-private; YouTube publishes each at its time
   (immediately if the time has passed).
