@@ -96,7 +96,7 @@ queue/YYYY-MM-DD/meta.json
    ```
    ffmpeg -y -i v.mp4 -i sfx.wav -i vo.wav -filter_complex "[2:a]aresample=44100,asplit=2[v1][v2];[1:a]volume=0.7[s];[s][v1]sidechaincompress=threshold=0.03:ratio=6:attack=5:release=250[d];[d][v2]amix=inputs=2:weights='1 1.6':normalize=0,alimiter=limit=0.95[a]" -map 0:v -map "[a]" -c:v libx264 -preset veryfast -crf 24 -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart -shortest out.mp4
    ```
-6. Write `meta.json`, append both challenges to `history.md` (date, title, threat, hazard,
+6. Write `meta.json`, append all challenges to `history.md` (date, title, threat, hazard,
    outcome), save the scenario scripts to `engine/scenarios/YYYY-MM-DD_v1.py` etc.
 7. Delete `queue/` folders older than 3 days (keeps the repo small).
 8. `git pull --rebase origin main`, commit, `git push origin main`. Verify with
