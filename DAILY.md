@@ -15,8 +15,20 @@ scenario ("Gloop daily YouTube upload", runs 12:00 Europe/Warsaw) downloads them
   Special days (Europe/Warsaw date): Oct 31 Halloween, Dec 24 Christmas Eve, Dec 25 Christmas,
   Dec 31 New Year's Eve, Jan 1 New Year, Feb 14 Valentine's Day, Apr 1 April Fools,
   Easter Sunday (compute it for the year).
+  **Themed Gloop skin on special days** (same blob + face, recolored and wearing a costume
+  drawn on top in cairo) — vary the skin across the 10 videos:
+  - Halloween: pumpkin-orange with carved-pumpkin stem + leaf hat, witch hat (purple),
+    ghost sheet (white, translucent), vampire cape + fangs, mummy bandages, black-cat ears.
+  - Christmas Eve / Christmas: Santa hat, reindeer antlers + red nose, elf hat (green),
+    snowman (white skin + carrot nose + scarf), gift-wrapped (ribbon bow on top).
+  - New Year's Eve / New Year: party hat + glasses with "20XX", gold glitter skin, confetti.
+  - Valentine's: pink skin, heart-shaped antenna, cupid wings.
+  - April Fools: clown nose + rainbow wig, upside-down jokes, rubber-chicken threat.
+  - Easter: bunny ears, pastel egg-pattern skin.
+  The claw, header and outro also get a light theme touch (e.g. orange/purple header accents
+  on Halloween, snow on the claw at Christmas).
   On special days work fast: reuse one themed scene/engine and vary threat + hazard + action
-  + outcome per video so all 10 get done before the deadline.
+  + skin + outcome per video so all 10 get done before the deadline.
 
 ## Output contract (what Make expects)
 
@@ -35,11 +47,15 @@ queue/YYYY-MM-DD/meta.json
 ]}
 ```
 - `title`: max 100 chars, no `<` or `>`, ends with `#shorts`.
-- `description`: hook line, "New Gloop challenges every day at 12:00!",
+- `description`: hook line, "New Gloop challenges every day!",
   "See you next challenge 👋", then 6–8 hashtags incl. #shorts #gloop #survival #challenge
   (plus occasion hashtags on special days).
 - `publishAt`: Warsaw time with correct offset (`TZ=Europe/Warsaw date +%:z`).
-  Normal day: all videos `12:00`. Special day: stagger them hourly `12:00, 13:00 … 21:00`.
+  Post when people watch most (covers EU lunch + evening and the US afternoon/evening):
+  - Normal weekday: `12:00`, `18:00`, `21:00`.
+  - Normal Sat/Sun: `14:00`, `18:00`, `21:00`.
+  - Special day (10 videos): `12:00, 13:00, 14:00, 15:00, 16:00, 17:00, 18:00, 19:00, 20:00, 21:00`.
+  - If there are extra videos, add `16:00` and `23:00`.
   Make uploads everything at 12:00 as scheduled-private; YouTube publishes each at its time
   (immediately if the time has passed).
 - Only list files that actually exist and finished correctly.
