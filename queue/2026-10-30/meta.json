@@ -1,7 +1,6 @@
 {
-  "t1": "Will Gloop survive the crocodile? 🐊 #shorts",
-  "d1": "Every bounce damages the rope... can Gloop last 15 seconds above the crocodile? 😬\n\nNew Gloop challenge every day at 12:00!\nSee you next challenge 👋\n\n#shorts #gloop #survival #challenge #animation #crocodile #satisfying",
-  "t2": "",
-  "d2": "",
-  "publishAt": "2030-01-01T12:00:00+01:00"
+  "videos": [
+    {"file": "v1.mp4", "title": "TEST upload (delete me) #shorts", "description": "test", "publishAt": "2030-01-01T12:00:00+01:00"},
+    {"file": "missing.mp4", "title": "should be skipped", "description": "x", "publishAt": "2030-01-01T12:00:00+01:00"}
+  ]
 }
