@@ -66,7 +66,7 @@ queue/YYYY-MM-DD/meta.json
 ## Challenge TYPES — mix them! (most important variety rule)
 
 The croc/rope example is only ONE type. Every day must use **at least 2 different types**
-(3 videos → 3 different types when possible; 10 videos → at least 5 types), and never the
+(3 videos → 3 different types when possible; 10 videos → at least 6 types), and never the
 same type for 2 videos in a row. Check `history.md` and favour types used least recently.
 Write the type in the history table's "Hazard bar" column, e.g. `STEALTH – DETECTED %`.
 
@@ -101,6 +101,22 @@ Write the type in the history table's "Hazard bar" column, e.g. `STEALTH – DET
 9. **WHO FIRST**: two or three colored blob rivals (not Gloop clones — Gloop is always the
    orange one) in the same trap; "WHO GETS EATEN FIRST?" style, Gloop may or may not be the
    last one standing.
+
+10. **NOISE / WAKE-UP**: Gloop must sneak past something sleeping (a bear, a dragon, a giant,
+    a guard dog, a grumpy grandpa robot) to reach a key/exit. `WAKE 0%` bar: every landing /
+    bump makes noise (+X%, sound-wave rings + "Z" bubbles stop), it slowly settles back when
+    he's quiet. Creaky floorboards, a squeaky toy or falling pots make big jumps. 100% =
+    `WOKEN UP!` → chase / grab = fail.
+11. **ITEMS LEFT**: a countdown of things that protect Gloop — `12 PLANKS LEFT`,
+    `8 BALLOONS LEFT`, `5 ICE BLOCKS LEFT`. Each hit/bounce removes one; reach the timer
+    end with at least 1 left = win.
+12. **HEIGHT / DISTANCE GAUGE**: a measured number with a line marker, e.g. `WALL 7.6 m`,
+    `WATER 4.2 m` or `GAP 3.1 m` — Gloop must bounce higher / jump further than the line,
+    each try shows the reached height with a ruler on the side; or something climbs toward
+    him and the meter counts the distance left.
+13. **FALLING OBJECT ABOVE**: a chandelier / piano / anvil hangs above Gloop on a chain that
+    loses links (`CHAIN 6 LINKS`) while he's stuck below (sticky floor, net, trapped foot)
+    and has to wiggle free before it drops.
 
 **Outcomes: Gloop must NOT always win.** Aim for roughly **half wins, half fails** each day
 (3 videos → at least 1 fail, often 2; 10 videos → 4–6 fails), randomize which ones, and make
