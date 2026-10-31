@@ -63,6 +63,48 @@ queue/YYYY-MM-DD/meta.json
   **file size under 4.5 MB** (Make free plan limit is 5 MB; use `-crf 24`, raise if needed).
 - Must be on `main` and pushed **before 11:50 Warsaw time**.
 
+## Challenge TYPES — mix them! (most important variety rule)
+
+The croc/rope example is only ONE type. Every day must use **at least 2 different types**
+(3 videos → 3 different types when possible; 10 videos → at least 5 types), and never the
+same type for 2 videos in a row. Check `history.md` and favour types used least recently.
+Write the type in the history table's "Hazard bar" column, e.g. `STEALTH – DETECTED %`.
+
+1. **DAMAGE BAR** (the croc one): each Gloop action damages what holds him (rope, branch,
+   ice, bubble). Bar goes DOWN; 0% = fail.
+2. **STEALTH – "Will Gloop stay unseen?"**: a guard / ghost / robot / owl / security camera
+   holds a **flashlight or searchlight whose beam sweeps** (up-down or left-right, changing
+   speed, sometimes pausing, reversing or faking out). Header shows `SURVIVE: 14.2s` and a
+   `DETECTED 37%` bar that fills red. **While Gloop is inside the light beam the % goes UP fast
+   (~35–45%/s); when he's out of it the % goes DOWN, but slower (~10–15%/s).** The scene has
+   **hiding spots** Gloop hops between: crates, barrels, bushes, tombstones, curtains, boxes,
+   trash cans, a sofa, a tree trunk. Behind cover = blocked from the light (beam visibly
+   stops at the object / object casts a shadow). Gloop sneaks with squishy hops, peeks out,
+   sometimes gets caught mid-move. Show an eye icon next to the bar that opens when he's
+   seen, `!` popups when % jumps. 100% → `SPOTTED!` + alarm flash + cage drops / guard grabs
+   him = fail. Timer runs out first = win → claw.
+3. **RISING DANGER – climb/escape**: lava / water / slime / sand rises; `HEIGHT` or
+   `AIR` meter; Gloop jumps platform to platform, some crumble.
+4. **DODGE – hearts**: falling anvils, saws, meteors, arrows; `❤❤❤` lives in the header
+   (draw hearts as shapes, not emoji), lose one per hit, 0 hearts = fail.
+5. **TEMPERATURE**: `FREEZE %` or `MELT %`; Gloop moves between a heater and a fan / sun and
+   shade; bar rises in the bad zone, falls slowly in the safe one.
+6. **GRIP / TUG**: magnet, vacuum, tornado or a giant hand pulls Gloop; `GRIP %` drains while
+   he holds on to a pole/ledge; brief regrips.
+7. **BALANCE**: Gloop on a seesaw / plank / floating log; `TILT` meter must stay out of the
+   red zones while things land on either side.
+8. **RACE**: Gloop vs a threat to a finish line / door; `DISTANCE` bars for both, obstacles
+   slow Gloop down.
+9. **WHO FIRST**: two or three colored blob rivals (not Gloop clones — Gloop is always the
+   orange one) in the same trap; "WHO GETS EATEN FIRST?" style, Gloop may or may not be the
+   last one standing.
+
+**Outcomes: Gloop must NOT always win.** Aim for roughly **half wins, half fails** each day
+(3 videos → at least 1 fail, often 2; 10 videos → 4–6 fails), randomize which ones, and make
+some of them super close (0.1s left, 99% detected). Fails stay cartoony and non-gory
+(caught in a cage, frozen in an ice cube, swallowed and spat out dizzy, launched into the
+sky, covered in goo), header `GLOOP FAILED!`, the claw still collects him, same outro.
+
 ## The Gloop format (keep it consistent)
 
 - **Gloop**: orange jelly blob (see `engine/examples/croc_rope_timer.py` → `draw_blob`),
@@ -77,7 +119,7 @@ queue/YYYY-MM-DD/meta.json
   and makes near-miss attempts.
 - **Ending**: at 0.0 s → `TIME!` → the **claw machine** drops in and grabs Gloop
   (it's the recurring "system"), header `GLOOP SURVIVED!` → `SEE YOU NEXT` / `CHALLENGE!`.
-  About 1 in 3 videos Gloop **fails** (bar hits 0 first): keep it cartoony and non-gory
+  About HALF of the videos Gloop **fails** (see Outcomes above): keep it cartoony and non-gory
   (e.g. croc gulps him and spits him out dizzy, he gets frozen in an ice cube, launched
   off-screen) → header `GLOOP FAILED!` → claw still collects him → same outro.
 - **Voice** (Kokoro TTS, voice `am_michael`, speed 1.0) — ONLY two lines:
