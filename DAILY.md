@@ -221,6 +221,9 @@ Write the type in the history table's "Hazard bar" column, e.g. `STEALTH – DET
    - he never steers, wanders, aims or dodges on purpose (only his face shows emotion);
    - scenes need visible walls he bounces off; draw ground from `TER` snapshots per frame (store
      `TER.snapshot()` each sim frame) with a darker fill behind it so craters show their walls.
+   **Hits must be real collisions**: transfer the object's momentum along the contact normal
+   (capped, see `meteor_vel` in the reference) — never add an upward kick in mid-air (looks like
+   he jumps by himself). Ground blasts only throw him when he's touching the ground.
    Step the ball once per frame INSIDE the sim and use `ball.x`/`ball.y` for every hit check.
    Reference with everything wired up: **`engine/scenarios/example_body_dodge.py`** (start new
    scenarios from it). (`Body` is obsolete; don't use it.)

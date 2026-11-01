@@ -17,7 +17,7 @@ GROUND = 1590; R = 58; GY = GROUND - R * 0.9; XMIN, XMAX = 165, 915; WALL_L, WAL
 WARN, FALL = 1.05, 0.75; SPEED = 760; HIT_R = 0.0
 
 # --- seeded meteors
-MET = []; t = 0.9; iv = 1.4
+MET = []; t = 0.9; iv = 1.6
 while t < S.T_END - 0.2:
     big = rng.random() < 0.25
     x = rng.uniform(150, 930) if t > S.T_START + 0.5 else rng.choice((rng.uniform(150, 300), rng.uniform(780, 930)))
@@ -29,6 +29,10 @@ while t < S.T_END - 0.2:
 # (~30% aimed at where he is when they appear). A meteor touching him on the way down = hit
 # (-1 heart, knocked away); a ground blast near him shoves him.
 TER = Terrain(GROUND, seed=SEED, bumps=5, amp=16)
+def meteor_vel(m, t):
+    k = clamp((t - (m['t'] - FALL)) / FALL, 0, 1)
+    sx, sy = m['x'] + 520, HEAD - 150; ex, ey = m['x'], TER.y(m['x']) - m['r'] * 0.3
+    return (ex - sx) * 2 * k / FALL, (ey - sy) * 2 * k / FALL
 def meteor_pos(m, t):
     k = clamp((t - (m['t'] - FALL)) / FALL, 0, 1)
     sx, sy = m['x'] + 520, HEAD - 150; ex, ey = m['x'], TER.y(m['x']) - m['r'] * 0.3
@@ -36,7 +40,7 @@ def meteor_pos(m, t):
 N0 = int(40 * FPS); GX, GYS, ROT, SQ, SHB = [], [], [], [], []
 ball = Ball(rng.uniform(320, 760), TER, R=R, seed=SEED, xmin=XMIN, xmax=XMAX); TH = []
 hearts = 3; HITS = []; inv_until = -1; HEARTS = []; T_FAIL = None
-for m in MET: m['aim'] = rng.random() < 0.3; m['set'] = False; m['hit'] = False
+for m in MET: m['aim'] = rng.random() < 0.24; m['set'] = False; m['hit'] = False
 for f in range(N0):
     t = f / FPS
     live = T_FAIL is None and S.T_START <= t < S.T_END
@@ -49,14 +53,16 @@ for f in range(N0):
             d = math.hypot(ball.x - mx, ball.y - my)
             if d < m['r'] * 0.62 + R * 0.7 and live and t > inv_until:
                 m['hit'] = True; nx, ny = (ball.x - mx) / (d or 1), (ball.y - my) / (d or 1)
-                ball.push(nx * 650 + (-300 if mx > ball.x else 300), min(-500, ny * 900))
+                vmx, vmy = meteor_vel(m, t)       # real collision: heavy rock transfers momentum along the contact normal
+                rel = (vmx - ball.vx) * nx + (vmy - ball.vy) * ny
+                if rel > 0: j = min(1.3 * rel, 900); ball.vx += j * nx; ball.vy += j * ny
                 hearts -= 1; HITS.append(t); inv_until = t + 0.9
                 if hearts == 0: T_FAIL = t
         if abs(m['t'] - t) < 0.5 / FPS:
             TER.dig(m['x'], 55 if m['big'] else 38, m['r'] * 0.75)          # real crater in the sand
         if abs(m['t'] - t) < 0.5 / FPS and not m['hit']:
             dx = ball.x - m['x']
-            if abs(dx) < m['r'] + 240 and ball.height() < 200:
+            if abs(dx) < m['r'] + 240 and ball.height() < 25:   # ground blast only throws him if he's touching the ground
                 k = 1 - max(0, abs(dx) - m['r']) / 240; ball.push((1 if dx >= 0 else -1) * 380 * k, -420 * k)
     ball.step(t)
     GX.append(ball.x); GYS.append(ball.y); ROT.append(0); SQ.append(0); SHB.append((ball.x, ball.height())); TH.append(TER.snapshot())
