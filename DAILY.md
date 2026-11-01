@@ -138,6 +138,11 @@ Write the type in the history table's "Hazard bar" column, e.g. `STEALTH – DET
   medium, only occasionally a nail-biter. Fails: some early and sudden (a big unlucky hit at
   9s), some mid-way, only occasionally at the very end. Max **1 in 5** videos may be decided
   in the last second.
+- **Gloop is not psychic.** He must never "know" where the danger lands: he wanders on his own,
+  notices a threat only sometimes (random delay, sometimes panics the wrong way or freezes), and
+  hazards partly aim at where he *is* (not where he'll be) and partly land at random. A dodge has
+  to come from luck + his real physical position, never from a perfect last-moment reaction.
+  Hits and near misses physically knock him around (`body.push`). See `example_body_dodge.py`.
 - **No convenient coincidences.** The bar should never sit at 1–3% for ages, the threat
   shouldn't conveniently miss at the last instant, and nothing breaks "just after" the
   rescue. When Gloop wins, the claw just picks him up — the hazard stays intact.

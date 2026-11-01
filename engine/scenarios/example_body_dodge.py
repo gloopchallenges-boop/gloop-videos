@@ -16,54 +16,58 @@ GROUND = 1590; R = 80; GY = GROUND - R * 0.9; XMIN, XMAX = 130, 950
 WARN, FALL = 1.05, 0.75; SPEED = 760; HIT_R = 0.0
 
 # --- seeded meteors
-MET = []; t = 0.9; iv = 1.2
+MET = []; t = 0.9; iv = 1.45
 while t < S.T_END - 0.2:
     big = rng.random() < 0.25
     x = rng.uniform(150, 930) if t > S.T_START + 0.5 else rng.choice((rng.uniform(150, 300), rng.uniform(780, 930)))
     MET.append({'t': t, 'x': x, 'r': 120 if big else 85, 'big': big})
-    t += rng.uniform(0.55, 1.15) * iv; iv = max(0.65, iv * 0.95)
+    t += rng.uniform(0.55, 1.15) * iv; iv = max(0.8, iv * 0.96)
 
-# --- simulate Gloop reacting + hits
-N0 = int(40 * FPS); GX = []; GYS, ROT, SQ = [], [], []; body = Body(540, GROUND, R=R, seed=SEED, speed=SPEED, xmin=XMIN, xmax=XMAX); gx = 540.0; target = 540.0; hearts = 3; HITS = []; inv_until = -1
-react = []  # (time Gloop starts reacting, meteor index)
-for i, m in enumerate(MET):
-    delay = rng.uniform(0.12, 0.75)
-    if rng.random() < 0.15: delay = 9  # froze / didn't notice
-    react.append((m['t'] - WARN + delay, i))
-react.sort(); ri = 0; HEARTS = []; T_FAIL = None
+# --- simulate: Gloop is NOT psychic. He wanders on his own, only sometimes notices a meteor (after a
+# random delay, sometimes panicking the wrong way); ~40% of meteors are aimed at where he is when they
+# appear, the rest land anywhere. Blasts knock him back; a hit launches him tumbling.
+N0 = int(40 * FPS); GX, GYS, ROT, SQ, SHB = [], [], [], [], []
+body = Body(rng.uniform(300, 780), GROUND, R=R, seed=SEED, speed=SPEED, xmin=XMIN, xmax=XMAX)
+target = body.x; next_wander = 0.0; hearts = 3; HITS = []; inv_until = -1; HEARTS = []; T_FAIL = None
+for m in MET:
+    m['aim'] = rng.random() < 0.28; m['notice'] = rng.random() < 0.7
+    m['delay'] = rng.uniform(0.25, 0.85); m['panic'] = rng.random() < 0.2; m['set'] = False
 for f in range(N0):
     t = f / FPS
-    while ri < len(react) and react[ri][0] <= t:
-        m = MET[react[ri][1]]; ri += 1
-        if m['t'] < t: continue
-        side = 1 if gx >= m['x'] else -1
-        dist = rng.uniform(170, 330) + m['r']
-        tx = m['x'] + side * dist
-        if tx < XMIN or tx > XMAX: tx = m['x'] - side * dist
-        target = clamp(tx, XMIN, XMAX)
-    if T_FAIL is None:
-        body.step(t, target)
-    gx = body.x
+    if t >= next_wander and T_FAIL is None:            # wander around on his own
+        target = clamp(body.x + rng.uniform(-380, 380), XMIN, XMAX); next_wander = t + rng.uniform(1.2, 3.2)
     for m in MET:
-        if T_FAIL is None and abs(m['t'] - t) < 0.5 / FPS and S.T_START <= t < S.T_END:
-            m['hit'] = abs(gx - m['x']) < m['r'] + R * 0.55 and t > inv_until
+        if not m['set'] and t >= m['t'] - WARN:          # meteor appears: aimed ones target his position now
+            if m['aim'] and t > S.T_START - 0.3: m['x'] = clamp(body.x + rng.uniform(-70, 70), 150, 930)
+            m['set'] = True
+        if m['set'] and m['notice'] and T_FAIL is None and abs(t - (m['t'] - WARN + m['delay'])) < 0.5 / FPS and t < m['t']:
+            side = (1 if body.x >= m['x'] else -1) * (-1 if m['panic'] else 1)
+            target = clamp(m['x'] + side * (m['r'] + rng.uniform(150, 320)), XMIN, XMAX); next_wander = t + rng.uniform(1.0, 2.0)
+        if abs(m['t'] - t) < 0.5 / FPS:
+            d = body.x - m['x']; away = 1 if d >= 0 else -1
+            live = T_FAIL is None and S.T_START <= t < S.T_END
+            m['hit'] = live and abs(d) < m['r'] + R * 0.55 and body.height() < 140 and t > inv_until
             if m['hit']:
-                hearts -= 1; HITS.append(t); inv_until = t + 0.9
+                body.push(away * rng.uniform(500, 800), -rng.uniform(900, 1200)); hearts -= 1; HITS.append(t); inv_until = t + 0.9
                 if hearts == 0: T_FAIL = t
-    GX.append(gx); GYS.append(body.draw_y()); ROT.append(body.rot); SQ.append(body.sq); HEARTS.append(hearts)
+            elif abs(d) < m['r'] + 260 and T_FAIL is None:   # near miss: blast shove
+                k = 1 - (abs(d) - m['r']) / 260; body.push(away * 420 * k, -380 * k)
+    body.step(t, target, active=T_FAIL is None and t < S.T_END + 0.3)
+    GX.append(body.x); GYS.append(body.draw_y()); ROT.append(body.rot); SQ.append(body.sq); SHB.append((body.x, body.height()))
+    HEARTS.append(hearts)
 S.OUTCOME = 'fail' if T_FAIL else 'win'
 S.T_RES = T_FAIL if T_FAIL else S.T_END
-S.GRAB = (GX[int(S.T_RES * FPS)], GROUND - R + 25)
+S.GRAB = (540, GROUND - R)
 END = S.END = Ending(S)
+gi = min(int(END.T_GRAB * FPS), N0 - 1); S.GRAB = (GX[gi], GYS[gi] + 25)
 S.events = [[S.T_START + 0.1, 'rumble', 1.2]]
 for m in MET:
-    if m['t'] - FALL < S.T_RES:
-        S.events.append([m['t'] - FALL, 'whoosh'])
-    if m['t'] <= S.T_RES + 0.01:
-        S.events.append([m['t'], 'crash']);
+    if m['t'] - FALL < S.T_RES + 0.3: S.events.append([m['t'] - FALL, 'whoosh'])
+    if m['t'] <= S.T_RES + 0.3:
+        S.events.append([m['t'], 'crash'])
         if m.get('hit'): S.events.append([m['t'] + 0.05, 'heart'])
 for (tl, xl, imp) in body.landings:
-    if tl < S.T_RES and imp > 0.05: S.events.append([tl, 'hop'])
+    if tl < S.T_RES + 1.0 and imp > 0.06: S.events.append([tl, 'thump', min(0.6, imp * 2)])
 S.AMB = {'drone': 48, 'wind': 0.025}
 
 def draw_bar(c, t, f):
@@ -109,7 +113,7 @@ def draw_bg(c, t):
 
 def draw_craters(c, t):
     for m in MET:
-        if m['t'] <= t and m['t'] <= S.T_RES + 0.01:
+        if m['t'] <= t and m['t'] <= S.T_RES + 0.3:
             c.set_source_rgb(*rgb('#7a3a24')); c.save(); c.translate(m['x'], GROUND + 6); c.scale(1, 0.22); c.arc(0, 0, m['r'] * 0.95, 0, 2 * math.pi); c.restore(); c.fill()
             c.set_source_rgb(*rgb('#5a2818')); c.save(); c.translate(m['x'], GROUND + 10); c.scale(1, 0.16); c.arc(0, 0, m['r'] * 0.6, 0, 2 * math.pi); c.restore(); c.fill()
             k = t - m['t']
@@ -120,16 +124,20 @@ def draw_craters(c, t):
 
 def draw_warnings(c, t):
     for m in MET:
-        if m['t'] - WARN <= t < m['t'] and m['t'] <= S.T_RES + 0.01:
-            k = (t - (m['t'] - WARN)) / WARN
-            c.set_source_rgba(1, 0.15, 0.1, 0.25 + 0.35 * k * (0.6 + 0.4 * math.sin(t * 30)))
-            c.save(); c.translate(m['x'], GROUND + 8); c.scale(1, 0.22); c.arc(0, 0, m['r'] * (0.4 + 0.6 * k), 0, 2 * math.pi); c.restore(); c.fill()
-            c.set_source_rgba(1, 0.3, 0.2, 0.8); c.set_line_width(4)
-            c.save(); c.translate(m['x'], GROUND + 8); c.scale(1, 0.22); c.arc(0, 0, m['r'], 0, 2 * math.pi); c.restore(); c.stroke()
+        if m['t'] - FALL <= t < m['t'] and m['t'] <= S.T_RES + 0.3:
+            k = (t - (m['t'] - FALL)) / FALL; k = k * k
+            gr = cairo.RadialGradient(0, 0, 0, 0, 0, 1)
+            gr.add_color_stop_rgba(0, 1, 0.45, 0.1, 0.22 * k); gr.add_color_stop_rgba(1, 1, 0.4, 0.1, 0)
+            c.save(); c.translate(m['x'], GROUND + 4); c.scale(m['r'] * (2.6 - 1.2 * k), 70); c.set_source(gr); c.arc(0, 0, 1, 0, 2 * math.pi); c.restore(); c.fill()
+            c.set_source_rgba(0, 0, 0, 0.3 * k); c.save(); c.translate(m['x'], GROUND + 6); c.scale(m['r'] * (0.5 + 0.5 * k), 14 * (0.5 + 0.5 * k)); c.arc(0, 0, 1, 0, 2 * math.pi); c.restore(); c.fill()
+        if m['t'] <= t < m['t'] + 0.5 and m['t'] <= S.T_RES + 0.3:   # shock ring
+            k = (t - m['t']) / 0.5
+            c.set_source_rgba(1, 0.85, 0.6, 0.6 * (1 - k)); c.set_line_width(10 * (1 - k) + 2)
+            c.save(); c.translate(m['x'], GROUND); c.scale(1, 0.22); c.arc(0, 0, m['r'] + 330 * k, 0, 2 * math.pi); c.restore(); c.stroke()
 
 def draw_meteors(c, t):
     for m in MET:
-        if m['t'] - FALL <= t < m['t'] and m['t'] <= S.T_RES + 0.01:
+        if m['t'] - FALL <= t < m['t'] and m['t'] <= S.T_RES + 0.3:
             k = (t - (m['t'] - FALL)) / FALL
             sx, sy = m['x'] + 520, HEAD - 150; ex, ey = m['x'], GROUND - m['r'] * 0.5
             x, y = lerp(sx, ex, k * k), lerp(sy, ey, k * k)
@@ -142,18 +150,23 @@ def draw_meteors(c, t):
             c.restore()
             c.set_source_rgba(1, 0.6, 0.2, 0.35); c.arc(x, y, r * 1.35, 0, 2 * math.pi); c.fill()
             c.set_source_rgb(*rgb('#6b4a3a')); c.arc(x, y, r, 0, 2 * math.pi); c.fill()
+            c.save(); c.translate(x, y); c.rotate(t * 7 + m['x']); c.translate(-x, -y)
             c.set_source_rgb(*rgb('#4d3226'))
             for dx, dy, rr in ((-0.3, -0.2, 0.25), (0.3, 0.25, 0.2), (0.1, -0.45, 0.14)): c.arc(x + dx * r, y + dy * r, rr * r, 0, 2 * math.pi); c.fill()
+            c.restore()
+            hl = cairo.RadialGradient(x - r * 0.5, y + r * 0.4, 0, x, y, r)   # lit from below-front by its own heat
+            hl.add_color_stop_rgba(0, 1, 0.7, 0.3, 0.55); hl.add_color_stop_rgba(1, 1, 0.4, 0.1, 0)
+            c.set_source(hl); c.arc(x, y, r, 0, 2 * math.pi); c.fill()
             c.set_source_rgba(1, 0.55, 0.15, 0.8); c.set_line_width(6); c.arc(x, y, r, 0, 2 * math.pi); c.stroke()
 
 PS = Particles(9)
 def render(f, c):
     t = f / FPS; shake = (0, 0)
     for m in MET:
-        if m['t'] <= t < m['t'] + 0.25 and m['t'] <= S.T_RES + 0.01:
+        if m['t'] <= t < m['t'] + 0.25 and m['t'] <= S.T_RES + 0.3:
             a = 14 if m['big'] else 9; shake = (rng.uniform(-a, a), rng.uniform(-a, a))
-        if f == int(round(m['t'] * FPS)) and m['t'] <= S.T_RES + 0.01:
-            PS.spawn(m['x'], GROUND - 10, 24, (1, 0.6, 0.25), 650, 0.7); PS.spawn(m['x'], GROUND - 10, 14, (0.55, 0.35, 0.3), 450, 0.9)
+        if f == int(round(m['t'] * FPS)) and m['t'] <= S.T_RES + 0.3:
+            PS.spawn(m['x'], GROUND - 10, 26, (1, 0.6, 0.25), 750, 0.6, r=7); PS.spawn(m['x'], GROUND - 10, 16, (0.45, 0.3, 0.25), 520, 1.1, grav=1800, r=12)
     c.save(); c.translate(*shake)
     draw_bg(c, t); draw_craters(c, t); draw_warnings(c, t)
     fi = min(f, len(GX) - 1)
@@ -162,19 +175,20 @@ def render(f, c):
     if END.carried(t):
         gx, gy = END.carry_xy(t); gy += 20; sq = 0.0; rot = 0
     else:
-        gx = GX[fi]; gy = GYS[fi]; sq = SQ[fi] + 0.02 * math.sin(t * 6); rot = ROT[fi]
-        if flat:
-            k = t - T_FAIL; sq = 0.45 * max(0.25, 1 - k / 2.0); gy = GROUND - R + R * sq * 0.9; rot = 0
-    blink = hits and t - hits[-1] < 0.9 and (t * 12) % 1 < 0.4 and not flat
+        gx = GX[fi]; gy = GYS[fi]; sq = SQ[fi]; rot = ROT[fi]
+        sx, sh = SHB[fi]; kk = 1 / (1 + sh / 220)
+        sg = cairo.RadialGradient(0, 0, 0, 0, 0, 1); sg.add_color_stop_rgba(0, 0, 0, 0, 0.4 * kk); sg.add_color_stop_rgba(1, 0, 0, 0, 0)
+        c.save(); c.translate(sx, GROUND + 4); c.scale(R * 1.15 * (0.6 + 0.4 * kk), R * 0.22); c.set_source(sg); c.arc(0, 0, 1, 0, 2 * math.pi); c.restore(); c.fill()
+    blink = hits and t - hits[-1] < 0.5 and (t * 12) % 1 < 0.35 and not flat
     danger = any(m['t'] - WARN <= t < m['t'] and abs(m['x'] - GX[fi]) < 300 for m in MET)
     mood = 'happy' if (t >= S.T_END and S.OUTCOME == 'win') else ('scared' if danger or flat else 'worried')
     if not blink:
-        draw_blob(c, t, gx, gy, mood, sq, R=R, dizzy=flat and t > T_FAIL + 0.6, rot=rot)
+        draw_blob(c, t, gx, gy, mood, sq, R=R, dizzy=flat and t > T_FAIL + 1.1, rot=rot)
     draw_meteors(c, t)
     PS.draw(c)
     for h in hits:
         if h <= t < h + 0.7 and (T_FAIL is None or h < T_FAIL):
-            k = (t - h) / 0.7; text_at(c, '-1', GX[int(h * FPS)] + 90, GY - 150 - 60 * k, 90, rgb('#ff4d6a'))
+            k = (t - h) / 0.7; text_at(c, '-1', GX[min(len(GX) - 1, int((h + 0.2) * FPS))] + 60, GY - 230 - 60 * k, 90, rgb('#ff4d6a'))
     if hits and t - hits[-1] < 0.15:
         c.set_source_rgba(1, 0.1, 0.1, 0.25); c.rectangle(0, HEAD, W, H - HEAD); c.fill()
     END.draw_claw(c, t)

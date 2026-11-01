@@ -63,7 +63,7 @@ def text_center(c, s, y, size, col, scale=1.0, shake=(0, 0)):
 def draw_blob(c, t, x, y, mood, squash=0.0, R=86, skin=('#ffd36b', '#ff8a1f', '#c45a00'), sweat=True, dizzy=False, rot=0.0):
     c.save(); c.translate(x, y)
     c.scale(1 + squash, 1 - squash); c.rotate(rot); c.scale(R / 86, R / 86)
-    c.set_source_rgba(1, 0.6, 0.2, 0.15); c.arc(0, 0, 110, 0, 2 * math.pi); c.fill()
+    c.set_source_rgba(1, 0.6, 0.2, 0.06); c.arc(0, 0, 104, 0, 2 * math.pi); c.fill()
     c.new_path()
     for i in range(61):
         a = i / 60 * 2 * math.pi
@@ -72,7 +72,13 @@ def draw_blob(c, t, x, y, mood, squash=0.0, R=86, skin=('#ffd36b', '#ff8a1f', '#
     c.close_path()
     gr = cairo.RadialGradient(-25, -30, 10, 0, 0, 86)
     gr.add_color_stop_rgb(0, *rgb(skin[0])); gr.add_color_stop_rgb(1, *rgb(skin[1]))
-    c.set_source(gr); c.fill_preserve(); c.set_line_width(5); c.set_source_rgb(*rgb(skin[2])); c.stroke()
+    c.set_source(gr); c.fill_preserve()
+    sh = cairo.LinearGradient(0, -86, 0, 86); sh.add_color_stop_rgba(0, 1, 1, 1, 0); sh.add_color_stop_rgba(0.55, 0, 0, 0, 0); sh.add_color_stop_rgba(1, 0.35, 0.1, 0, 0.35)
+    c.set_source(sh); c.fill_preserve(); c.set_line_width(5); c.set_source_rgb(*rgb(skin[2])); c.stroke()
+    c.save(); c.translate(-36, -48); c.rotate(-0.6); c.scale(26, 13); c.arc(0, 0, 1, 0, 2 * math.pi); c.restore()
+    c.set_source_rgba(1, 1, 1, 0.55); c.fill()
+    c.set_source_rgba(1, 1, 1, 0.7); c.arc(-8, -66, 6, 0, 2 * math.pi); c.fill()
+    c.set_source_rgba(1, 0.95, 0.8, 0.25); c.set_line_width(6); c.arc(0, 0, 78, 0.2, 1.3); c.stroke()
     c.set_source_rgba(1, 0.35, 0.35, 0.45)
     c.arc(-44, 18, 13, 0, 2 * math.pi); c.fill(); c.arc(44, 18, 13, 0, 2 * math.pi); c.fill()
     blink = (t % 3.7) < 0.08 and mood == 'worried'
@@ -122,85 +128,97 @@ def draw_blob(c, t, x, y, mood, squash=0.0, R=86, skin=('#ffd36b', '#ff8a1f', '#
         c.move_to(dx, dy - 14); c.curve_to(dx + 10, dy, dx + 8, dy + 10, dx, dy + 10); c.curve_to(dx - 8, dy + 10, dx - 10, dy, dx, dy - 14); c.fill()
 
 class Body:
-    """Physical, seeded-random Gloop movement. Step it once per frame INSIDE the sim and use
-    body.x / body.y for every hit / detection / distance check, so the outcome follows what you see.
-      body.step(t, target_x, active=True)   -> moves toward target_x with a randomly chosen gait:
-         'hop'  : a chain of hops with random height/length, squash on each landing
-         'roll' : rolls on the ground (body spins by distance/R), overshoots a bit, settles upright
-      idle (near target): fidgets — random small hops, little shuffles, wobble.
-      body.push(vx, vy)                     -> external shove (wind, explosion, knock-back)
-    Draw with: draw_blob(c, t, b.x, b.y, mood, b.sq, R=b.R, rot=b.rot)
-    ground: float or function x -> ground line y (where his bottom rests)."""
+    """Physical, seeded-random Gloop movement — a bouncy jelly ball that never stops dead.
+    Step once per frame INSIDE the sim; use body.x / body.y for every hit/detection check.
+      body.step(t, target_x, active=True): heads toward target_x with a random gait ('hop' chains of
+        random hops, or 'roll'); landings rebound (decaying bounces) and keep horizontal momentum,
+        which turns into rolling/sliding on the ground (body + face spin with distance), then he wobbles
+        upright. Near the target he keeps drifting, bobbing and doing little hops — never frozen.
+      body.push(vx, vy): external shove / blast knock-back (sends him tumbling).
+    Draw: draw_blob(c, t, b.x, b.draw_y(), mood, b.sq, R=b.R, rot=b.rot); contact_shadow(c, b) first."""
     G = 2600.0
     def __init__(self, x, ground, R=80, seed=1, speed=620, xmin=None, xmax=None, roll_p=0.4, fidget=1.0):
         self.rng = random.Random(seed * 7919 + 13); self.R = R; self.ground = ground
         self.x = x; self.vx = 0.0; self.vy = 0.0; self.rot = 0.0; self.vrot = 0.0
         self.sq = 0.0; self.vsq = 0.0; self.air = False; self.mode = 'idle'; self.speed = speed
         self.xmin = R + 10 if xmin is None else xmin; self.xmax = W - R - 10 if xmax is None else xmax
-        self.roll_p = roll_p; self.fidget = fidget; self.next_idle = 0.6; self.landings = []
-        self.y = self.gy(x) - R
+        self.roll_p = roll_p; self.fidget = fidget; self.next_act = 0.3; self.landings = []
+        self.y = self.gy(x) - R; self.tumble = 0.0
     def gy(self, x): return self.ground(x) if callable(self.ground) else self.ground
+    def height(self): return max(0.0, self.gy(self.x) - self.R - self.y)
     def push(self, vx, vy=-400):
-        self.vx += vx; self.vy = min(self.vy, vy); self.air = True; self.mode = 'shoved'; self.vrot += vx / self.R * 0.6
+        self.vx += vx; self.vy = min(self.vy, vy); self.air = True; self.mode = 'shoved'
+        self.vrot += vx / self.R * 0.9; self.tumble = 1.0
     def _hop(self, h, dist_x):
-        vy = -math.sqrt(2 * self.G * h); tair = 2 * h / -vy * 2 if vy else 0.4
-        tair = -2 * vy / self.G
-        self.vy = vy; self.vx = clamp(dist_x / max(0.15, tair), -self.speed * 1.5, self.speed * 1.5); self.air = True
-        self.vsq = -2.5  # stretch on take-off
-        if self.rng.random() < 0.25: self.vrot = self.rng.choice((-1, 1)) * self.rng.uniform(4, 9)  # random flip/spin
+        vy = -math.sqrt(2 * self.G * max(5, h)); tair = -2 * vy / self.G
+        self.vy = vy; self.vx = clamp(self.vx * 0.3 + dist_x / max(0.15, tair), -self.speed * 1.5, self.speed * 1.5)
+        self.air = True; self.vsq = -2.6
+        if self.rng.random() < 0.2: self.vrot = self.rng.choice((-1, 1)) * self.rng.uniform(5, 10)
     def step(self, t, target, active=True, dt=1 / FPS):
         rng = self.rng; R = self.R
         target = clamp(target, self.xmin, self.xmax); dx = target - self.x
-        if not self.air and active:
-            if abs(dx) > 30:
+        if not self.air and active and self.tumble < 0.3:
+            if abs(dx) > 40:
                 if self.mode not in ('hop', 'roll'):
                     self.mode = 'roll' if rng.random() < self.roll_p else 'hop'
-                if self.mode == 'hop':
-                    h = rng.uniform(40, 150); step = math.copysign(min(abs(dx), rng.uniform(90, 240)), dx)
-                    self._hop(h, step)
-                else:  # roll: accelerate along the ground, bumps make little random bounces
-                    acc = 2600 * (1 if dx > 0 else -1)
-                    self.vx = clamp(self.vx + acc * dt, -self.speed * 1.25, self.speed * 1.25)
-                    if abs(dx) < abs(self.vx) * 0.18: self.vx *= 0.82   # brake late -> small overshoot
-                    if rng.random() < 0.03: self.vy = -rng.uniform(150, 320); self.air = True
+                if self.mode == 'hop':   # chain the next hop straight from the landing — no pause
+                    self._hop(rng.uniform(35, 160), math.copysign(min(abs(dx), rng.uniform(100, 260)), dx))
+                else:
+                    self.vx = clamp(self.vx + 2400 * math.copysign(1, dx) * dt, -self.speed * 1.25, self.speed * 1.25)
+                    if abs(dx) < abs(self.vx) * 0.15: self.vx *= 0.9          # late brake -> overshoot
+                    if rng.random() < 0.04: self.vy = -rng.uniform(180, 380); self.air = True   # bumps
             else:
-                if self.mode in ('hop', 'roll', 'shoved'): self.mode = 'idle'; self.next_idle = t + rng.uniform(0.3, 1.0)
-                self.vx *= 0.8
-                if t >= self.next_idle:
+                self.mode = 'idle'
+                if t >= self.next_act:   # restless: bob, little hops, short drifting rolls
                     r = rng.random()
-                    if r < 0.45 * self.fidget: self._hop(rng.uniform(15, 60), rng.uniform(-40, 40))
-                    elif r < 0.65 * self.fidget: self.vx = rng.uniform(-160, 160)
-                    else: self.vsq = rng.uniform(-2, 2)   # jiggle in place
-                    self.next_idle = t + rng.uniform(0.35, 1.3)
+                    if r < 0.45 * self.fidget: self._hop(rng.uniform(15, 70), rng.uniform(-70, 70))
+                    elif r < 0.8 * self.fidget: self.vx += rng.uniform(-220, 220)
+                    else: self.vsq += rng.uniform(-2.5, 2.5)
+                    self.next_act = t + rng.uniform(0.25, 0.8)
         # integrate
         self.x += self.vx * dt
-        if self.x < self.xmin: self.x = self.xmin; self.vx = abs(self.vx) * 0.4
-        if self.x > self.xmax: self.x = self.xmax; self.vx = -abs(self.vx) * 0.4
+        if self.x < self.xmin: self.x = self.xmin; self.vx = abs(self.vx) * 0.5; self.vsq += 1.5
+        if self.x > self.xmax: self.x = self.xmax; self.vx = -abs(self.vx) * 0.5; self.vsq += 1.5
         gy = self.gy(self.x)
         if self.air:
             self.vy += self.G * dt; self.y += self.vy * dt
             if self.y >= gy - R:
-                imp = min(0.35, self.vy / 3200)
-                self.y = gy - R; self.air = False; self.vsq += imp * 22; self.landings.append((t, self.x, imp))
-                self.vy = -self.vy * 0.25 if self.vy > 500 else 0   # tiny rebound
-                if self.vy: self.air = True
-                if self.mode == 'hop': self.vx *= 0.3
+                imp = min(0.4, self.vy / 3000)
+                self.y = gy - R; self.vsq += imp * 24; self.landings.append((t, self.x, imp))
+                if self.vy > 260:   # jelly rebound: decaying bounces
+                    self.vy = -self.vy * 0.42; self.air = True
+                else:
+                    self.vy = 0; self.air = False
+                self.vx *= 0.8      # keep most momentum -> rolls / slides out of the landing
         else:
-            self.y = gy - R
-            if not active: self.vx *= 0.85
-        # rotation: rolling on ground spins by distance; otherwise spring back upright (nearest full turn)
-        if not self.air and self.mode == 'roll': self.rot += self.vx * dt / R
+            self.y = gy - R + 3 * math.sin(t * 7)  # always a little alive
+            self.vx *= (1 - 2.2 * dt)              # rolling friction: glides to a stop, never instantly
+        self.tumble = max(0.0, self.tumble - dt * 0.9)
+        # rotation: on the ground he rolls with distance; when slow he wobbles back upright
+        if not self.air and abs(self.vx) > 45:
+            self.rot += self.vx * dt / R; self.vrot = self.vx / R
         else:
-            self.rot += self.vrot * dt; self.vrot *= 0.96
+            self.rot += self.vrot * dt; self.vrot *= (0.985 if self.air else 1)
             if not self.air:
                 tgt = round(self.rot / (2 * math.pi)) * 2 * math.pi
-                self.vrot += (tgt - self.rot) * 60 * dt - self.vrot * 9 * dt
-        # squash spring (+ = squashed flat, - = stretched tall)
-        self.vsq += (-self.sq * 260 - self.vsq * 13) * dt; self.sq += self.vsq * dt
-        self.sq = clamp(self.sq, -0.28, 0.4)
+                self.vrot += ((tgt - self.rot) * 70 - self.vrot * 8) * dt
+        self.vsq += (-self.sq * 240 - self.vsq * 11) * dt; self.sq = clamp(self.sq + self.vsq * dt, -0.3, 0.42)
         return self.x, self.y
-    def draw_y(self):  # keep the bottom on the ground while squashed
-        return self.y + self.R * max(0, self.sq) * 0.9
+    def draw_y(self): return self.y + self.R * max(0, self.sq) * 0.9
+
+
+def contact_shadow(c, b, alpha=0.35):
+    """Soft ground shadow under a Body: shrinks/fades as he goes up — sells height & weight."""
+    h = b.height(); k = 1 / (1 + h / 220)
+    gr = cairo.RadialGradient(0, 0, 0, 0, 0, 1)
+    gr.add_color_stop_rgba(0, 0, 0, 0, alpha * k); gr.add_color_stop_rgba(1, 0, 0, 0, 0)
+    c.save(); c.translate(b.x, b.gy(b.x) + 4); c.scale(b.R * 1.15 * (0.6 + 0.4 * k) * (1 + max(0, b.sq)), b.R * 0.22); c.set_source(gr); c.arc(0, 0, 1, 0, 2 * math.pi); c.fill(); c.restore()
+
+
+def vignette(c, strength=0.45):
+    gr = cairo.RadialGradient(W / 2, (H + HEAD) / 2, 380, W / 2, (H + HEAD) / 2, 1150)
+    gr.add_color_stop_rgba(0, 0, 0, 0, 0); gr.add_color_stop_rgba(1, 0, 0, 0, strength)
+    c.set_source(gr); c.rectangle(0, HEAD, W, H - HEAD); c.fill()
 
 
 def star_path(c, x, y, r):
@@ -260,8 +278,9 @@ class Ending:
         g0 = S.T_START + GUESS_AT
         self.T_GUESS = g0 if S.T_RES > g0 + GUESS_LEN + 0.6 else None
     def overlay(self, c, t):
-        """Drawn on top of every frame: record badge + mid-video guess prompt."""
+        """Drawn on top of every frame: vignette + record badge + mid-video guess prompt."""
         S = self.S; w, l = self.REC; pop = 0.0
+        vignette(c)
         if t >= self.T_TEXT:
             if S.OUTCOME == 'win': w += 1
             else: l += 1
