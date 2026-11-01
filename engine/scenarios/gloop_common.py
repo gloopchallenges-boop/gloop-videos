@@ -73,12 +73,7 @@ def draw_blob(c, t, x, y, mood, squash=0.0, R=86, skin=('#ffd36b', '#ff8a1f', '#
     gr = cairo.RadialGradient(-25, -30, 10, 0, 0, 86)
     gr.add_color_stop_rgb(0, *rgb(skin[0])); gr.add_color_stop_rgb(1, *rgb(skin[1]))
     c.set_source(gr); c.fill_preserve()
-    sh = cairo.LinearGradient(0, -86, 0, 86); sh.add_color_stop_rgba(0, 1, 1, 1, 0); sh.add_color_stop_rgba(0.55, 0, 0, 0, 0); sh.add_color_stop_rgba(1, 0.35, 0.1, 0, 0.35)
-    c.set_source(sh); c.fill_preserve(); c.set_line_width(5); c.set_source_rgb(*rgb(skin[2])); c.stroke()
-    c.save(); c.translate(-36, -48); c.rotate(-0.6); c.scale(26, 13); c.arc(0, 0, 1, 0, 2 * math.pi); c.restore()
-    c.set_source_rgba(1, 1, 1, 0.55); c.fill()
-    c.set_source_rgba(1, 1, 1, 0.7); c.arc(-8, -66, 6, 0, 2 * math.pi); c.fill()
-    c.set_source_rgba(1, 0.95, 0.8, 0.25); c.set_line_width(6); c.arc(0, 0, 78, 0.2, 1.3); c.stroke()
+    c.set_line_width(5); c.set_source_rgb(*rgb(skin[2])); c.stroke()
     c.set_source_rgba(1, 0.35, 0.35, 0.45)
     c.arc(-44, 18, 13, 0, 2 * math.pi); c.fill(); c.arc(44, 18, 13, 0, 2 * math.pi); c.fill()
     blink = (t % 3.7) < 0.08 and mood == 'worried'
@@ -355,32 +350,8 @@ class Ending:
         g0 = S.T_START + GUESS_AT
         self.T_GUESS = g0 if S.T_RES > g0 + GUESS_LEN + 0.6 else None
     def overlay(self, c, t):
-        """Drawn on top of every frame: vignette + record badge + mid-video guess prompt."""
-        S = self.S; w, l = self.REC; pop = 0.0
-        vignette(c)
-        if t >= self.T_TEXT:
-            if S.OUTCOME == 'win': w += 1
-            else: l += 1
-            pop = max(0.0, 1 - (t - self.T_TEXT) / 0.4)
-        font(c, 34); s1 = 'GLOOP RECORD'; s2 = f'{w}W - {l}L'
-        e1 = c.text_extents(s1); font(c, 44); e2 = c.text_extents(s2)
-        bw = max(e1.x_advance, e2.x_advance) + 40
-        c.save(); c.translate(24, HEAD + 22); c.scale(1 + 0.25 * pop, 1 + 0.25 * pop)
-        c.set_source_rgba(0.05, 0.04, 0.08, 0.72); rrect(c, 0, 0, bw, 104, 22); c.fill()
-        c.set_source_rgb(*(rgb('#7dff8a') if pop and S.OUTCOME == 'win' else rgb('#ff4d4d') if pop else rgb('#ffd36b'))); c.set_line_width(4); rrect(c, 0, 0, bw, 104, 22); c.stroke()
-        c.restore()
-        text_at(c, s1, 24 + bw / 2, HEAD + 22 + 30, 30, (0.85, 0.85, 0.9), 1 + 0.25 * pop, lw=6)
-        text_at(c, s2, 24 + bw / 2, HEAD + 22 + 72, 44, (1, 1, 1), 1 + 0.25 * pop, lw=7)
-        if self.T_GUESS is not None and self.T_GUESS <= t < self.T_GUESS + GUESS_LEN:
-            k = (t - self.T_GUESS) / GUESS_LEN
-            a = min(1, k / 0.12, (1 - k) / 0.12); sc = 0.7 + 0.3 * ease(k / 0.15)
-            y = HEAD + 250
-            c.save(); c.translate(W / 2, y); c.scale(sc, sc)
-            c.set_source_rgba(0.05, 0.04, 0.08, 0.75 * a); rrect(c, -400, -95, 800, 190, 36); c.fill()
-            c.restore()
-            if a > 0.3:
-                text_at(c, 'SURVIVE OR FAIL?', W / 2, y - 35, 72 * sc, rgb('#ffd36b'), lw=9)
-                text_at(c, 'COMMENT YOUR GUESS!', W / 2, y + 45, 50 * sc, (1, 1, 1), lw=8)
+        """Hook for frame-wide overlays. Intentionally empty: flat minimal style, no badge/prompt."""
+        return
     def claw_pos(self, t):
         gx, gy = self.S.GRAB; ry = gy - 150
         if t < self.T_CLAW_IN: return None

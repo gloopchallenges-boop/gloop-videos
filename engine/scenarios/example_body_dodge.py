@@ -93,91 +93,68 @@ def draw_bar(c, t, f):
         c.restore()
 S.draw_bar = draw_bar
 
-stars = [(rng.uniform(0, W), rng.uniform(HEAD, 1200), rng.uniform(1, 3), rng.uniform(0, 6)) for _ in range(90)]
-dunes = [(rng.uniform(-100, W + 100), rng.uniform(140, 260)) for _ in range(6)]
-rocks = [(rng.uniform(40, W - 40), rng.uniform(GROUND + 40, H - 40), rng.uniform(10, 26)) for _ in range(18)]
+# ---- flat, muted, minimal art (style: dark night, few flat shapes, one light source) ----
+stars = [(rng.uniform(0, W), rng.uniform(HEAD, 1250), rng.uniform(1.2, 2.6)) for _ in range(60)]
+hills = [(x, rng.uniform(80, 170)) for x in range(-100, W + 200, 260)]
+SKY, HILL, HILL2, SAND, SAND_D, RIM, WALL, WALL_D = '#17141f', '#231d2b', '#2b2333', '#6b4a35', '#3a281d', '#7d5940', '#3b302c', '#2e2522'
 
 def draw_bg(c, t, th):
-    gr = cairo.LinearGradient(0, HEAD, 0, GROUND)
-    gr.add_color_stop_rgb(0, *rgb('#1a0f33')); gr.add_color_stop_rgb(0.7, *rgb('#4a2357')); gr.add_color_stop_rgb(1, *rgb('#a2456a'))
-    c.set_source(gr); c.rectangle(0, HEAD, W, GROUND - HEAD); c.fill()
-    for x, y, r, ph in stars:
-        c.set_source_rgba(1, 1, 0.95, 0.35 + 0.35 * math.sin(t * 2 + ph)); c.arc(x, y, r, 0, 2 * math.pi); c.fill()
-    # planet + moon
-    c.set_source_rgba(*hexc('#7fd3ff', 0.12)); c.arc(820, 600, 170, 0, 2 * math.pi); c.fill()
-    gp = cairo.RadialGradient(780, 560, 20, 820, 600, 140); gp.add_color_stop_rgb(0, *rgb('#9fe3ff')); gp.add_color_stop_rgb(1, *rgb('#3a7bbf'))
-    c.set_source(gp); c.arc(820, 600, 140, 0, 2 * math.pi); c.fill()
-    c.set_source_rgba(1, 1, 1, 0.35); c.set_line_width(10); c.save(); c.translate(820, 600); c.rotate(-0.3); c.scale(1, 0.25); c.arc(0, 0, 220, 0.15, math.pi - 0.15); c.restore(); c.stroke()
-    c.set_source_rgb(*rgb('#e8d8ff')); c.arc(260, 520, 42, 0, 2 * math.pi); c.fill()
-    c.set_source_rgb(*rgb('#c6b4e8')); c.arc(250, 510, 9, 0, 2 * math.pi); c.fill()
-    for i, (x, h) in enumerate(dunes):
-        c.set_source_rgb(*rgb('#6d2f5e' if i % 2 else '#5c2852'))
-        c.move_to(x - 420, GROUND); c.curve_to(x - 200, GROUND - h, x + 200, GROUND - h, x + 420, GROUND); c.close_path(); c.fill()
-    gb = cairo.LinearGradient(0, GROUND - 30, 0, GROUND + 260); gb.add_color_stop_rgb(0, *rgb('#8f4a2c')); gb.add_color_stop_rgb(1, *rgb('#5a2a18'))
-    c.set_source(gb); c.rectangle(0, GROUND - 30, W, H - GROUND + 30); c.fill()   # crater back walls
-    TER.fill(c, th, '#d27445', '#7a3420', '#f09a63')
+    c.set_source_rgb(*rgb(SKY)); c.rectangle(0, HEAD, W, H - HEAD); c.fill()
+    c.set_source_rgba(0.85, 0.82, 0.75, 0.5)
+    for x, y, r in stars: c.arc(x, y, r, 0, 2 * math.pi); c.fill()
+    c.set_source_rgb(*rgb('#e6d6ae')); c.arc(800, 600, 58, 0, 2 * math.pi); c.fill()          # flat crescent moon
+    c.set_source_rgb(*rgb(SKY)); c.arc(828, 584, 52, 0, 2 * math.pi); c.fill()
+    for i, (x, hh) in enumerate(hills):
+        c.set_source_rgb(*rgb(HILL if i % 2 else HILL2))
+        c.move_to(x - 260, GROUND); c.curve_to(x - 120, GROUND - hh, x + 120, GROUND - hh, x + 260, GROUND); c.close_path(); c.fill()
+    c.set_source_rgb(*rgb(SAND_D)); c.rectangle(0, GROUND - 30, W, H - GROUND + 30); c.fill()   # crater back walls
+    c.move_to(0, H)
+    for x in range(0, W + 1, 6): c.line_to(x, th[x])
+    c.line_to(W, H); c.close_path(); c.set_source_rgb(*rgb(SAND)); c.fill()
+    c.set_line_width(4); c.set_source_rgb(*rgb(RIM))
+    for x in range(0, W + 1, 6): (c.move_to if x == 0 else c.line_to)(x, th[x])
+    c.stroke()
+    c.set_source_rgba(0, 0, 0, 0.12); c.set_line_width(3)
+    for yy in range(GROUND + 70, H, 70): c.move_to(0, yy); c.line_to(W, yy); c.stroke()
     for (x0, x1) in ((0, WALL_L), (WALL_R, W)):
-        c.set_source_rgb(*rgb('#7a3b26')); c.move_to(x0, GROUND + 30); c.line_to(x0, 1050); c.curve_to(x0 + 20, 1000, x1 - 10, 1010, x1, 1080); c.line_to(x1, GROUND + 30); c.close_path(); c.fill()
-        c.set_source_rgba(1, 0.75, 0.5, 0.18); c.rectangle((x1 - 14) if x0 == 0 else x0, 1090, 14, GROUND - 1090); c.fill()
-        c.set_source_rgba(0, 0, 0, 0.18)
-        for yy in range(1130, GROUND, 110): c.rectangle(x0 + 10, yy, x1 - x0 - 20, 8); c.fill()
-    for x, y, r in rocks:
-        if y < th[int(x)] + 25: continue
-        c.set_source_rgb(*rgb('#9c4f30')); c.save(); c.translate(x, y); c.scale(1, 0.55); c.arc(0, 0, r, 0, 2 * math.pi); c.restore(); c.fill()
+        c.set_source_rgb(*rgb(WALL)); c.rectangle(x0, 1040, x1 - x0, GROUND + 40 - 1040); c.fill()
+        c.set_source_rgb(*rgb(WALL_D))
+        for yy in range(1040, GROUND + 40, 64): c.rectangle(x0, yy, x1 - x0, 4); c.fill()
 
 def draw_craters(c, t):
     for m in MET:
-        if m['t'] <= t and m['t'] <= S.T_RES + 0.3:
-            k = t - m['t']
-            if k < 1.4:  # smoke
-                for j in range(5):
-                    c.set_source_rgba(0.4, 0.35, 0.4, 0.35 * (1 - k / 1.4))
-                    c.arc(m['x'] + (j - 2) * 30, GROUND - 30 - k * 120 - j * 12, 30 + k * 30, 0, 2 * math.pi); c.fill()
+        if m['t'] <= t < m['t'] + 1.2 and m['t'] <= S.T_RES + 0.3:
+            k = (t - m['t']) / 1.2
+            c.set_source_rgba(0.35, 0.28, 0.24, 0.5 * (1 - k))
+            for j in range(4): c.arc(m['x'] + (j - 1.5) * 34, GROUND - 40 - k * 90 - j * 8, 22 + k * 26, 0, 2 * math.pi); c.fill()
 
 def draw_warnings(c, t):
-    for m in MET:
+    for m in MET:   # just the meteor's flat shadow growing on the sand
         if m['t'] - FALL <= t < m['t'] and m['t'] <= S.T_RES + 0.3:
             k = (t - (m['t'] - FALL)) / FALL; k = k * k
-            gr = cairo.RadialGradient(0, 0, 0, 0, 0, 1)
-            gr.add_color_stop_rgba(0, 1, 0.45, 0.1, 0.22 * k); gr.add_color_stop_rgba(1, 1, 0.4, 0.1, 0)
-            c.save(); c.translate(m['x'], GROUND + 4); c.scale(m['r'] * (2.6 - 1.2 * k), 70); c.set_source(gr); c.arc(0, 0, 1, 0, 2 * math.pi); c.restore(); c.fill()
-            c.set_source_rgba(0, 0, 0, 0.13 * k); c.save(); c.translate(m['x'], GROUND + 6); c.scale(m['r'] * (0.5 + 0.5 * k), 14 * (0.5 + 0.5 * k)); c.arc(0, 0, 1, 0, 2 * math.pi); c.restore(); c.fill()
-        if m['t'] <= t < m['t'] + 0.5 and m['t'] <= S.T_RES + 0.3:   # shock ring
-            k = (t - m['t']) / 0.5
-            c.set_source_rgba(1, 0.85, 0.6, 0.6 * (1 - k)); c.set_line_width(10 * (1 - k) + 2)
-            c.save(); c.translate(m['x'], GROUND); c.scale(1, 0.22); c.arc(0, 0, m['r'] + 330 * k, 0, 2 * math.pi); c.restore(); c.stroke()
+            c.set_source_rgba(0, 0, 0, 0.18 * k); c.save(); c.translate(m['x'], GROUND + 4); c.scale(m['r'] * (0.4 + 0.5 * k), 12); c.arc(0, 0, 1, 0, 2 * math.pi); c.restore(); c.fill()
 
 def draw_meteors(c, t):
     for m in MET:
         if m['t'] - FALL <= t < m['t'] and m['t'] <= S.T_RES + 0.3:
-            sx, sy = m['x'] + 520, HEAD - 150; ex, ey = m['x'], GROUND - m['r'] * 0.5
-            x, y = meteor_pos(m, t)
-            ang = math.atan2(ey - sy, ex - sx)
-            r = m['r'] * 0.62
+            sx, sy = m['x'] + 520, HEAD - 150; ex, ey = m['x'], GROUND
+            x, y = meteor_pos(m, t); ang = math.atan2(ey - sy, ex - sx); r = m['r'] * 0.62
             c.save(); c.translate(x, y); c.rotate(ang)
-            gr = cairo.LinearGradient(0, 0, -r * 6, 0)
-            gr.add_color_stop_rgba(0, 1, 0.75, 0.3, 0.9); gr.add_color_stop_rgba(1, 1, 0.3, 0.1, 0)
-            c.set_source(gr); c.move_to(0, -r); c.line_to(-r * 6, 0); c.line_to(0, r); c.close_path(); c.fill()
+            c.set_source_rgba(0.85, 0.5, 0.25, 0.55); c.move_to(0, -r * 0.8); c.line_to(-r * 4.5, 0); c.line_to(0, r * 0.8); c.close_path(); c.fill()
+            c.set_source_rgba(0.95, 0.75, 0.4, 0.6); c.move_to(0, -r * 0.4); c.line_to(-r * 2.5, 0); c.line_to(0, r * 0.4); c.close_path(); c.fill()
             c.restore()
-            c.set_source_rgba(1, 0.6, 0.2, 0.35); c.arc(x, y, r * 1.35, 0, 2 * math.pi); c.fill()
-            c.set_source_rgb(*rgb('#6b4a3a')); c.arc(x, y, r, 0, 2 * math.pi); c.fill()
-            c.save(); c.translate(x, y); c.rotate(t * 7 + m['x']); c.translate(-x, -y)
-            c.set_source_rgb(*rgb('#4d3226'))
-            for dx, dy, rr in ((-0.3, -0.2, 0.25), (0.3, 0.25, 0.2), (0.1, -0.45, 0.14)): c.arc(x + dx * r, y + dy * r, rr * r, 0, 2 * math.pi); c.fill()
-            c.restore()
-            hl = cairo.RadialGradient(x - r * 0.5, y + r * 0.4, 0, x, y, r)   # lit from below-front by its own heat
-            hl.add_color_stop_rgba(0, 1, 0.7, 0.3, 0.55); hl.add_color_stop_rgba(1, 1, 0.4, 0.1, 0)
-            c.set_source(hl); c.arc(x, y, r, 0, 2 * math.pi); c.fill()
-            c.set_source_rgba(1, 0.55, 0.15, 0.8); c.set_line_width(6); c.arc(x, y, r, 0, 2 * math.pi); c.stroke()
+            c.set_source_rgb(*rgb('#4a3d36')); c.arc(x, y, r, 0, 2 * math.pi); c.fill()
+            c.set_source_rgb(*rgb('#3a2f2a'))
+            for dx, dy, rr in ((-0.3, -0.2, 0.25), (0.32, 0.22, 0.2), (0.05, -0.5, 0.13)): c.arc(x + dx * r, y + dy * r, rr * r, 0, 2 * math.pi); c.fill()
 
 PS = Particles(9)
 def render(f, c):
     t = f / FPS; shake = (0, 0)
     for m in MET:
         if m['t'] <= t < m['t'] + 0.25 and m['t'] <= S.T_RES + 0.3:
-            a = 14 if m['big'] else 9; shake = (rng.uniform(-a, a), rng.uniform(-a, a))
+            a = 5 if m['big'] else 3; shake = (rng.uniform(-a, a), rng.uniform(-a, a))
         if f == int(round(m['t'] * FPS)) and m['t'] <= S.T_RES + 0.3:
-            PS.spawn(m['x'], TH[min(f, len(TH) - 1)][int(m['x'])] - 10, 26, (1, 0.6, 0.25), 750, 0.6, r=7); PS.spawn(m['x'], TH[min(f, len(TH) - 1)][int(m['x'])] - 10, 16, (0.45, 0.3, 0.25), 520, 1.1, grav=1800, r=12)
+            PS.spawn(m['x'], TH[min(f, len(TH) - 1)][int(m['x'])] - 6, 22, (0.42, 0.29, 0.21), 600, 0.9, grav=2400, r=8)
     c.save(); c.translate(*shake)
     fi = min(f, len(GX) - 1)
     draw_bg(c, t, TH[fi]); draw_craters(c, t); draw_warnings(c, t)
@@ -188,20 +165,14 @@ def render(f, c):
     else:
         gx = GX[fi]; gy = GYS[fi]; sq = SQ[fi]; rot = ROT[fi]
         sx, sh = SHB[fi]; kk = 1 / (1 + sh / 220)
-        sg = cairo.RadialGradient(0, 0, 0, 0, 0, 1); sg.add_color_stop_rgba(0, 0, 0, 0, 0.4 * kk); sg.add_color_stop_rgba(1, 0, 0, 0, 0)
-        c.save(); c.translate(sx, TER.y(sx) if False else TH[fi][int(clamp(sx, 0, W - 1))] + 2); c.scale(R * 1.15 * (0.6 + 0.4 * kk), R * 0.22); c.set_source(sg); c.arc(0, 0, 1, 0, 2 * math.pi); c.restore(); c.fill()
-    blink = hits and t - hits[-1] < 0.5 and (t * 12) % 1 < 0.35 and not flat
+        c.set_source_rgba(0, 0, 0, 0.22 * kk); c.save(); c.translate(sx, TH[fi][int(clamp(sx, 0, W - 1))] + 2); c.scale(R * (0.5 + 0.4 * kk), 9); c.arc(0, 0, 1, 0, 2 * math.pi); c.restore(); c.fill()
+    blink = False
     danger = any(m['t'] - WARN <= t < m['t'] and abs(m['x'] - GX[fi]) < 300 for m in MET)
     mood = 'happy' if (t >= S.T_END and S.OUTCOME == 'win') else ('scared' if danger or flat else 'worried')
     if not blink:
         draw_blob(c, t, gx, gy, mood, 0, R=R, dizzy=flat and t > T_FAIL + 0.4)
     draw_meteors(c, t)
     PS.draw(c)
-    for h in hits:
-        if h <= t < h + 0.7 and (T_FAIL is None or h < T_FAIL):
-            k = (t - h) / 0.7; text_at(c, '-1', GX[min(len(GX) - 1, int((h + 0.2) * FPS))] + 60, GYS[min(len(GYS) - 1, int((h + 0.2) * FPS))] - 140 - 60 * k, 80, rgb('#ff4d6a'))
-    if hits and t - hits[-1] < 0.15:
-        c.set_source_rgba(1, 0.1, 0.1, 0.25); c.rectangle(0, HEAD, W, H - HEAD); c.fill()
     END.draw_claw(c, t)
     c.restore()
     END.header(c, t, min(f, len(HEARTS) - 1))

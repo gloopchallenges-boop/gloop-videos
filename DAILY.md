@@ -172,12 +172,12 @@ Write the type in the history table's "Hazard bar" column, e.g. `STEALTH – DET
   off-screen) → header `GLOOP FAILED!` → claw still collects him → same outro.
   **Keep the ending short** (~3.8 s from result to the last frame: claw in at +0.6 s, outro at
   +2.3 s).
-- **Engagement features (automatic in `engine/scenarios/gloop_common.py`, keep them on):**
-  - **Guess prompt**: `SURVIVE OR FAIL?` / `COMMENT YOUR GUESS!` panel ~2.2 s after the timer
-    starts, for 1.8 s (skipped automatically if the result comes too soon after it).
-  - **Record badge**: top-left `GLOOP RECORD 11W - 6L`, counted from `history.md`; it ticks up
-    (+1 W or +1 L) when the result text appears. So **append each video's history row right
-    after building it** — then the next video's record includes it (or set env `RECORD=W-L`).
+- **Art style: flat, muted, minimal** (like real bounce-sim Shorts): dark night palette, flat
+  shapes, one quiet light source, few objects. NO glows, gradients-everywhere, comet glow, red
+  screen flashes, `-1` pop-ups, record badge or comment prompt. Small screen shake only. Gloop keeps
+  his own orange skin and face (the only bright thing on screen). Keep: the SURVIVE timer header
+  with its bar/hearts, the claw ending and the two voice lines.
+- **Engagement (automatic in `gloop_common.py`):**
   - **Seamless loop**: the last 0.4 s crossfade into frame 0, so the Short loops (rewatches).
 - **Voice** (Kokoro TTS, voice `am_michael`, speed 1.0) — ONLY two lines:
   `"Will Gloop survive <the threat>?"` at 0.2 s and `"See you next challenge!"` at the outro.
