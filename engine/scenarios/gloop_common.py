@@ -60,9 +60,9 @@ def text_at(c, s, x, y, size, col, scale=1.0, lw=10):
 def text_center(c, s, y, size, col, scale=1.0, shake=(0, 0)):
     text_at(c, s, W / 2 + shake[0], y + shake[1], size, col, scale)
 
-def draw_blob(c, t, x, y, mood, squash=0.0, R=86, skin=('#ffd36b', '#ff8a1f', '#c45a00'), sweat=True, dizzy=False):
-    c.save(); c.translate(x, y); c.scale(R / 86, R / 86)
-    c.scale(1 + squash, 1 - squash)
+def draw_blob(c, t, x, y, mood, squash=0.0, R=86, skin=('#ffd36b', '#ff8a1f', '#c45a00'), sweat=True, dizzy=False, rot=0.0):
+    c.save(); c.translate(x, y)
+    c.scale(1 + squash, 1 - squash); c.rotate(rot); c.scale(R / 86, R / 86)
     c.set_source_rgba(1, 0.6, 0.2, 0.15); c.arc(0, 0, 110, 0, 2 * math.pi); c.fill()
     c.new_path()
     for i in range(61):
@@ -120,6 +120,88 @@ def draw_blob(c, t, x, y, mood, squash=0.0, R=86, skin=('#ffd36b', '#ff8a1f', '#
         c.set_source_rgba(0.6, 0.85, 1, 0.9 * (1 - k))
         dx, dy = x + R * 0.72, y - R * 0.58 + k * 50
         c.move_to(dx, dy - 14); c.curve_to(dx + 10, dy, dx + 8, dy + 10, dx, dy + 10); c.curve_to(dx - 8, dy + 10, dx - 10, dy, dx, dy - 14); c.fill()
+
+class Body:
+    """Physical, seeded-random Gloop movement. Step it once per frame INSIDE the sim and use
+    body.x / body.y for every hit / detection / distance check, so the outcome follows what you see.
+      body.step(t, target_x, active=True)   -> moves toward target_x with a randomly chosen gait:
+         'hop'  : a chain of hops with random height/length, squash on each landing
+         'roll' : rolls on the ground (body spins by distance/R), overshoots a bit, settles upright
+      idle (near target): fidgets — random small hops, little shuffles, wobble.
+      body.push(vx, vy)                     -> external shove (wind, explosion, knock-back)
+    Draw with: draw_blob(c, t, b.x, b.y, mood, b.sq, R=b.R, rot=b.rot)
+    ground: float or function x -> ground line y (where his bottom rests)."""
+    G = 2600.0
+    def __init__(self, x, ground, R=80, seed=1, speed=620, xmin=None, xmax=None, roll_p=0.4, fidget=1.0):
+        self.rng = random.Random(seed * 7919 + 13); self.R = R; self.ground = ground
+        self.x = x; self.vx = 0.0; self.vy = 0.0; self.rot = 0.0; self.vrot = 0.0
+        self.sq = 0.0; self.vsq = 0.0; self.air = False; self.mode = 'idle'; self.speed = speed
+        self.xmin = R + 10 if xmin is None else xmin; self.xmax = W - R - 10 if xmax is None else xmax
+        self.roll_p = roll_p; self.fidget = fidget; self.next_idle = 0.6; self.landings = []
+        self.y = self.gy(x) - R
+    def gy(self, x): return self.ground(x) if callable(self.ground) else self.ground
+    def push(self, vx, vy=-400):
+        self.vx += vx; self.vy = min(self.vy, vy); self.air = True; self.mode = 'shoved'; self.vrot += vx / self.R * 0.6
+    def _hop(self, h, dist_x):
+        vy = -math.sqrt(2 * self.G * h); tair = 2 * h / -vy * 2 if vy else 0.4
+        tair = -2 * vy / self.G
+        self.vy = vy; self.vx = clamp(dist_x / max(0.15, tair), -self.speed * 1.5, self.speed * 1.5); self.air = True
+        self.vsq = -2.5  # stretch on take-off
+        if self.rng.random() < 0.25: self.vrot = self.rng.choice((-1, 1)) * self.rng.uniform(4, 9)  # random flip/spin
+    def step(self, t, target, active=True, dt=1 / FPS):
+        rng = self.rng; R = self.R
+        target = clamp(target, self.xmin, self.xmax); dx = target - self.x
+        if not self.air and active:
+            if abs(dx) > 30:
+                if self.mode not in ('hop', 'roll'):
+                    self.mode = 'roll' if rng.random() < self.roll_p else 'hop'
+                if self.mode == 'hop':
+                    h = rng.uniform(40, 150); step = math.copysign(min(abs(dx), rng.uniform(90, 240)), dx)
+                    self._hop(h, step)
+                else:  # roll: accelerate along the ground, bumps make little random bounces
+                    acc = 2600 * (1 if dx > 0 else -1)
+                    self.vx = clamp(self.vx + acc * dt, -self.speed * 1.25, self.speed * 1.25)
+                    if abs(dx) < abs(self.vx) * 0.18: self.vx *= 0.82   # brake late -> small overshoot
+                    if rng.random() < 0.03: self.vy = -rng.uniform(150, 320); self.air = True
+            else:
+                if self.mode in ('hop', 'roll', 'shoved'): self.mode = 'idle'; self.next_idle = t + rng.uniform(0.3, 1.0)
+                self.vx *= 0.8
+                if t >= self.next_idle:
+                    r = rng.random()
+                    if r < 0.45 * self.fidget: self._hop(rng.uniform(15, 60), rng.uniform(-40, 40))
+                    elif r < 0.65 * self.fidget: self.vx = rng.uniform(-160, 160)
+                    else: self.vsq = rng.uniform(-2, 2)   # jiggle in place
+                    self.next_idle = t + rng.uniform(0.35, 1.3)
+        # integrate
+        self.x += self.vx * dt
+        if self.x < self.xmin: self.x = self.xmin; self.vx = abs(self.vx) * 0.4
+        if self.x > self.xmax: self.x = self.xmax; self.vx = -abs(self.vx) * 0.4
+        gy = self.gy(self.x)
+        if self.air:
+            self.vy += self.G * dt; self.y += self.vy * dt
+            if self.y >= gy - R:
+                imp = min(0.35, self.vy / 3200)
+                self.y = gy - R; self.air = False; self.vsq += imp * 22; self.landings.append((t, self.x, imp))
+                self.vy = -self.vy * 0.25 if self.vy > 500 else 0   # tiny rebound
+                if self.vy: self.air = True
+                if self.mode == 'hop': self.vx *= 0.3
+        else:
+            self.y = gy - R
+            if not active: self.vx *= 0.85
+        # rotation: rolling on ground spins by distance; otherwise spring back upright (nearest full turn)
+        if not self.air and self.mode == 'roll': self.rot += self.vx * dt / R
+        else:
+            self.rot += self.vrot * dt; self.vrot *= 0.96
+            if not self.air:
+                tgt = round(self.rot / (2 * math.pi)) * 2 * math.pi
+                self.vrot += (tgt - self.rot) * 60 * dt - self.vrot * 9 * dt
+        # squash spring (+ = squashed flat, - = stretched tall)
+        self.vsq += (-self.sq * 260 - self.vsq * 13) * dt; self.sq += self.vsq * dt
+        self.sq = clamp(self.sq, -0.28, 0.4)
+        return self.x, self.y
+    def draw_y(self):  # keep the bottom on the ground while squashed
+        return self.y + self.R * max(0, self.sq) * 0.9
+
 
 def star_path(c, x, y, r):
     for i in range(10):

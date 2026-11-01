@@ -207,6 +207,13 @@ Write the type in the history table's "Hazard bar" column, e.g. `STEALTH – DET
    win/fail mix, then render. **New scenarios: `S.T_START = HOOK_T`, timer 11–15 s, hazard in
    motion from t=0.** (The 2026-11-01 files still use the old 2.6 s hook / 15–16 s timer.)
    `engine/examples/` holds the older standalone references.
+   **Gloop must move physically, never on a fixed path** (scripted glides/identical hops look
+   fake): drive him with `Body` from `gloop_common.py` — gravity, random hop heights/lengths,
+   rolls (body + face spin with distance, overshoot, settle upright), random flips, squash on
+   landing, fidgety idle hops/shuffles, `body.push()` for shoves. Step the body once per frame
+   INSIDE the sim and use `body.x`/`body.y` for every hit/detection check; draw with
+   `draw_blob(..., b.sq, rot=b.rot)` at `b.draw_y()`. Reference with everything wired up:
+   **`engine/scenarios/example_body_dodge.py`** (start new scenarios from it).
 4. **Check frames before rendering**: render ~8 stills at key moments
    (`python3 scenario.py out/st events.json 1,4,9,13,16.5,17.6,19,21`), tile them and LOOK
    at them. Fix anything broken (things off-screen, overlapping text, wrong timing).
