@@ -207,45 +207,80 @@ class Body:
     def draw_y(self): return self.y + self.R * max(0, self.sq) * 0.9
 
 
+class Terrain:
+    """Ground as a height line (y per x pixel). soft=True: every impact digs a dent, so the ground gets
+    uneven and later bounces go off at new angles — exactly like real physics-sim Shorts.
+    y(x) ground line, slope(x) dy/dx, dig(x, depth, width) makes a dent/crater, fill(c, ...) draws it."""
+    def __init__(self, base, seed=1, bumps=4, amp=18, soft=True):
+        rng = random.Random(seed * 31 + 5); xs = np.arange(W + 1, dtype=float)
+        self.h = np.full(W + 1, float(base))
+        for _ in range(bumps):
+            cx, wd, a = rng.uniform(0, W), rng.uniform(90, 260), rng.uniform(-amp, amp)
+            self.h += a * np.exp(-((xs - cx) / wd) ** 2)
+        self.base = base; self.soft = soft; self.xs = xs
+    def y(self, x):
+        x = clamp(x, 0, W - 1); i = int(x); f = x - i
+        return self.h[i] * (1 - f) + self.h[i + 1] * f
+    def slope(self, x, d=30): return (self.y(x + d) - self.y(x - d)) / (2 * d)
+    def dig(self, x, depth, width):
+        self.h += depth * np.exp(-((self.xs - x) / width) ** 2)
+        self.h = np.minimum(self.h, self.base + 260)
+    def snapshot(self): return self.h.copy()
+    def fill(self, c, h, top_col, deep_col, rim_col=None):
+        c.move_to(0, H)
+        for x in range(0, W + 1, 6): c.line_to(x, h[x])
+        c.line_to(W, H); c.close_path()
+        gr = cairo.LinearGradient(0, self.base - 40, 0, H); gr.add_color_stop_rgb(0, *rgb(top_col)); gr.add_color_stop_rgb(1, *rgb(deep_col))
+        c.set_source(gr); c.fill()
+        if rim_col:
+            c.set_line_width(5); c.set_source_rgb(*rgb(rim_col))
+            for x in range(0, W + 1, 6): (c.move_to if x == 0 else c.line_to)(x, h[x])
+            c.stroke()
+
+
 class Ball:
-    """Gloop as a passive bouncy jelly ball — no mind, no steering. He keeps bouncing in the same
-    direction at a steady rhythm; direction/speed change ONLY from collisions: walls (xmin/xmax),
-    things that hit him, blasts (ball.push). Extra energy from a hit dies out over a few bounces,
-    then he settles back to his normal bounce. Spin comes from ground contact (rolls with vx).
-    Step once per frame inside the sim; use ball.x / ball.y for every collision / hit check.
-    Draw: contact_shadow(c, b); draw_blob(c, t, b.x, b.draw_y(), mood, b.sq, R=b.R, rot=b.rot)"""
-    G = 2600.0
-    def __init__(self, x, ground, R=80, seed=1, vx=None, hop=None, xmin=None, xmax=None, e_wall=0.92):
-        rng = random.Random(seed * 104729 + 7); self.R = R; self.ground = ground
-        self.vx = vx if vx is not None else rng.choice((-1, 1)) * rng.uniform(220, 360)
-        self.base_v = abs(self.vx); self.base_h = hop if hop is not None else rng.uniform(100, 180)
-        self.x = x; self.y = self.gy(x) - R - self.base_h * rng.uniform(0.2, 1.0); self.vy = 0.0
+    """Gloop as a rigid bouncy ball (like real physics-sim Shorts). Constant gravity, parabolic arcs,
+    bounces reflect off the actual ground slope (Terrain), walls reflect, things that hit him push him.
+    No steering, no spin, face stays upright. Bounces never die out (a minimum bounce speed keeps
+    him going); extra energy from hits dies out through restitution. On soft terrain each landing
+    digs a small dent -> the ground gets bumpy and his path changes naturally.
+    Step once per frame inside the sim; use ball.x / ball.y for every hit check.
+    Draw: draw_blob(c, t, b.x, b.y, mood, 0, R=b.R)."""
+    G = 3200.0
+    def __init__(self, x, terrain, R=55, seed=1, vx=None, hop=None, xmin=None, xmax=None, e=0.82, e_wall=0.9, dent=0.006):
+        rng = random.Random(seed * 104729 + 7); self.R = R; self.T = terrain
+        self.vx = vx if vx is not None else rng.choice((-1, 1)) * rng.uniform(200, 340)
+        self.base_h = hop if hop is not None else rng.uniform(220, 300)
+        self.vmin = math.sqrt(2 * self.G * self.base_h)
+        self.x = x; self.y = terrain.y(x) - R - self.base_h * rng.uniform(0.3, 1.0); self.vy = 0.0
         self.xmin = R + 10 if xmin is None else xmin; self.xmax = W - R - 10 if xmax is None else xmax
-        self.e_wall = e_wall; self.rot = 0.0; self.w = self.vx / R; self.sq = 0.0; self.vsq = 0.0
-        self.landings = []; self.walls = []; self.frozen = False
-    def gy(self, x): return self.ground(x) if callable(self.ground) else self.ground
-    def height(self): return max(0.0, self.gy(self.x) - self.R - self.y)
-    def push(self, vx, vy):
-        self.vx += vx; self.vy = min(self.vy + vy, vy); self.w += vx / self.R * 0.8; self.vsq -= 2.0
-    def step(self, t, dt=1 / FPS):
+        self.e, self.e_wall, self.dent = e, e_wall, dent; self.vxmax = 430
+        self.landings = []; self.walls = []; self.frozen = False; self.rot = 0.0; self.sq = 0.0
+    def height(self): return max(0.0, self.T.y(self.x) - self.R - self.y)
+    def push(self, vx, vy): self.vx += vx; self.vy = min(self.vy + vy, vy); self._pushed = True
+    def step(self, t, dt=1 / FPS, sub=4):
         if self.frozen: return self.x, self.y
-        R = self.R
-        self.vy += self.G * dt; self.x += self.vx * dt; self.y += self.vy * dt
-        if self.x < self.xmin: self.x = self.xmin; self.vx = abs(self.vx) * self.e_wall; self.vsq -= 3.0; self.w = -self.w * 0.5; self.walls.append(t)
-        if self.x > self.xmax: self.x = self.xmax; self.vx = -abs(self.vx) * self.e_wall; self.vsq -= 3.0; self.w = -self.w * 0.5; self.walls.append(t)
-        gy = self.gy(self.x)
-        if self.y >= gy - R and self.vy > 0:
-            h_now = self.vy ** 2 / (2 * self.G)
-            imp = min(0.4, self.vy / 3000); self.vsq += imp * 22; self.landings.append((t, self.x, imp))
-            h_new = max(self.base_h, h_now * 0.62) if h_now > self.base_h * 1.05 else self.base_h
-            self.y = gy - R; self.vy = -math.sqrt(2 * self.G * h_new)
-            if abs(self.vx) > self.base_v * 1.05: self.vx *= 0.8          # extra speed from a hit dies out
-            elif abs(self.vx) < self.base_v * 0.95: self.vx = math.copysign(min(self.base_v, abs(self.vx) / 0.8 if self.vx else self.base_v), self.vx or 1)
-            self.w = self.vx / R                                               # ground contact sets the roll spin
-        self.rot += self.w * dt
-        self.vsq += (-self.sq * 240 - self.vsq * 11) * dt; self.sq = clamp(self.sq + self.vsq * dt, -0.3, 0.42)
+        h = dt / sub
+        for _ in range(sub):
+            self.vy += self.G * h; self.x += self.vx * h; self.y += self.vy * h
+            if self.x < self.xmin: self.x = self.xmin; self.vx = abs(self.vx) * self.e_wall; self.walls.append(t)
+            if self.x > self.xmax: self.x = self.xmax; self.vx = -abs(self.vx) * self.e_wall; self.walls.append(t)
+            gy = self.T.y(self.x)
+            if self.y + self.R > gy:
+                g = self.T.slope(self.x); n = math.hypot(g, 1); nx, ny = g / n, -1 / n
+                vn = self.vx * nx + self.vy * ny
+                if vn < 0:
+                    self.vx -= (1 + self.e) * vn * nx; self.vy -= (1 + self.e) * vn * ny
+                    if self.vy > -self.vmin: self.vy = -self.vmin * (1 + 0.04 * (abs(g) * 3))   # bounces never die out
+                    self.vy = max(self.vy, -self.vmin * 1.6)
+                    if abs(self.vx) > self.vxmax: self.vx = math.copysign(max(self.vxmax, abs(self.vx) * 0.7), self.vx)
+                    if abs(self.vx) > self.vxmax * 1.25 and not getattr(self, '_pushed', False): self.vx = math.copysign(self.vxmax * 1.25, self.vx)
+                    self._pushed = False
+                    self.landings.append((t, self.x, -vn))
+                    if self.T.soft and self.dent: self.T.dig(self.x, self.dent * -vn, self.R * 0.9)
+                self.y = gy - self.R
         return self.x, self.y
-    def draw_y(self): return self.y + self.R * max(0, self.sq) * 0.9
+    def draw_y(self): return self.y
 
 
 def contact_shadow(c, b, alpha=0.35):
@@ -253,7 +288,8 @@ def contact_shadow(c, b, alpha=0.35):
     h = b.height(); k = 1 / (1 + h / 220)
     gr = cairo.RadialGradient(0, 0, 0, 0, 0, 1)
     gr.add_color_stop_rgba(0, 0, 0, 0, alpha * k); gr.add_color_stop_rgba(1, 0, 0, 0, 0)
-    c.save(); c.translate(b.x, b.gy(b.x) + 4); c.scale(b.R * 1.15 * (0.6 + 0.4 * k) * (1 + max(0, b.sq)), b.R * 0.22); c.set_source(gr); c.arc(0, 0, 1, 0, 2 * math.pi); c.fill(); c.restore()
+    gyy = b.T.y(b.x) if hasattr(b, 'T') else b.gy(b.x)
+    c.save(); c.translate(b.x, gyy + 2); c.scale(b.R * 1.1 * (0.6 + 0.4 * k), b.R * 0.2); c.set_source(gr); c.arc(0, 0, 1, 0, 2 * math.pi); c.fill(); c.restore()
 
 
 def vignette(c, strength=0.45):
@@ -423,14 +459,14 @@ def run(S, render):
     if len(sys.argv) > 3:
         want = {int(x * FPS) for x in map(float, sys.argv[3].split(','))}
         for f in range(min(N, max(want) + 1)):
-            c = cairo.Context(surf); render(f, c); S.END.overlay(c, f / FPS)
+            c = cairo.Context(surf); c.set_source_rgb(0, 0, 0); c.paint(); render(f, c); S.END.overlay(c, f / FPS)
             if f in want: surf.write_to_png(f'{out}_{f:04d}.png')
         return
     ff = subprocess.Popen(['ffmpeg', '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'bgra', '-s', f'{W}x{H}', '-r', str(FPS), '-i', '-',
                            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', out], stdin=subprocess.PIPE)
     first = None; NL = int(LOOP_T * FPS)
     for f in range(N):
-        c = cairo.Context(surf); render(f, c); S.END.overlay(c, f / FPS); surf.flush()
+        c = cairo.Context(surf); c.set_source_rgb(0, 0, 0); c.paint(); render(f, c); S.END.overlay(c, f / FPS); surf.flush()
         buf = bytes(surf.get_data())
         if f == 0: first = np.frombuffer(buf, np.uint8).astype(np.float32)
         if f >= N - NL:   # crossfade into frame 0 -> seamless loop

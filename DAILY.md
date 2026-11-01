@@ -210,15 +210,20 @@ Write the type in the history table's "Hazard bar" column, e.g. `STEALTH – DET
    win/fail mix, then render. **New scenarios: `S.T_START = HOOK_T`, timer 11–15 s, hazard in
    motion from t=0.** (The 2026-11-01 files still use the old 2.6 s hook / 15–16 s timer.)
    `engine/examples/` holds the older standalone references.
-   **Gloop is a passive bouncy jelly ball, not a character with a mind.** Use `Ball` from
-   `gloop_common.py`: he bounces steadily in ONE direction (spinning as he rolls) and changes
-   direction/speed ONLY when something physically interferes — a wall, a falling object, a blast,
-   a gust, a push (`ball.push`). Extra energy from a hit dies out over a few bounces. He never
-   steers, wanders, aims, dodges or reacts on purpose (only his face shows emotion). Scenes need
-   visible walls/edges he bounces off. Step the ball once per frame INSIDE the sim and use
-   `ball.x`/`ball.y` for every hit/detection check; draw with `draw_blob(..., b.sq, rot=b.rot)` at
-   `b.draw_y()`. Reference with everything wired up: **`engine/scenarios/example_body_dodge.py`**
-   (start new scenarios from it). (`Body` — a steering version — is obsolete; don't use it.)
+   **Gloop moves like a real physics-sim ball, not a character with a mind** (style reference:
+   bounce-sim Shorts like @bouncefactory0). Use `Ball` + `Terrain` from `gloop_common.py`:
+   - rigid ball, R ≈ 55–60 px (≈ 10% of the width), NO squash, NO spin — face stays upright;
+   - constant gravity (3200 px/s²), true parabolic arcs, bounces reflect off the real ground SLOPE;
+   - soft `Terrain`: every landing digs a small dent and impacts dig craters (`TER.dig`), so the
+     ground gets uneven and his direction/height change naturally — only from collisions
+     (walls, slopes, dents, things hitting him, `ball.push`). Bounces never die out (min bounce
+     speed), extra energy from hits fades;
+   - he never steers, wanders, aims or dodges on purpose (only his face shows emotion);
+   - scenes need visible walls he bounces off; draw ground from `TER` snapshots per frame (store
+     `TER.snapshot()` each sim frame) with a darker fill behind it so craters show their walls.
+   Step the ball once per frame INSIDE the sim and use `ball.x`/`ball.y` for every hit check.
+   Reference with everything wired up: **`engine/scenarios/example_body_dodge.py`** (start new
+   scenarios from it). (`Body` is obsolete; don't use it.)
 4. **Check frames before rendering**: render ~8 stills at key moments
    (`python3 scenario.py out/st events.json 1,4,9,13,16.5,17.6,19,21`), tile them and LOOK
    at them. Fix anything broken (things off-screen, overlapping text, wrong timing).

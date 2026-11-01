@@ -1,6 +1,7 @@
-"""REFERENCE (new format + Body physics) — DODGE – HEARTS: METEOR SHOWER on an alien desert. Meteors are seeded-random
-(time, target, size); Gloop reacts to each warning shadow with a random reaction delay and runs
-with a capped speed — whether a meteor hits is simulated from positions."""
+"""REFERENCE (new format + rigid-ball physics on soft Terrain) — DODGE – HEARTS: METEOR SHOWER.
+Gloop is a passive rigid bouncy ball (Ball): parabolic arcs, bounces off the real ground slope,
+walls reflect, every landing dents the soft sand, meteor impacts dig real craters that change his
+later bounces. Meteors are seeded-random (some aimed at where he is). Hits come from positions."""
 import sys, os, math, random
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gloop_common import *
@@ -12,29 +13,30 @@ rng = random.Random(SEED)
 class S: pass
 S.HOOK2 = 'THE METEOR SHOWER?'; S.HOOK2_SIZE = 86; S.FAIL_WORD = 'SQUASHED!'; S.FAIL_SIZE = 140
 S.T_START = HOOK_T; S.TL = 13.0; S.T_END = S.T_START + S.TL
-GROUND = 1590; R = 80; GY = GROUND - R * 0.9; XMIN, XMAX = 165, 915; WALL_L, WALL_R = XMIN - R, XMAX + R
+GROUND = 1590; R = 58; GY = GROUND - R * 0.9; XMIN, XMAX = 165, 915; WALL_L, WALL_R = XMIN - R, XMAX + R
 WARN, FALL = 1.05, 0.75; SPEED = 760; HIT_R = 0.0
 
 # --- seeded meteors
-MET = []; t = 0.9; iv = 1.9
+MET = []; t = 0.9; iv = 1.4
 while t < S.T_END - 0.2:
     big = rng.random() < 0.25
     x = rng.uniform(150, 930) if t > S.T_START + 0.5 else rng.choice((rng.uniform(150, 300), rng.uniform(780, 930)))
     MET.append({'t': t, 'x': x, 'r': 120 if big else 85, 'big': big})
-    t += rng.uniform(0.55, 1.15) * iv; iv = max(1.05, iv * 0.96)
+    t += rng.uniform(0.55, 1.15) * iv; iv = max(0.8, iv * 0.96)
 
 # --- simulate: Gloop is a passive bouncy ball (Ball) — he keeps bouncing the same way and only
 # changes direction when he hits a rock wall or something hits him. Meteors fall at random spots
 # (~30% aimed at where he is when they appear). A meteor touching him on the way down = hit
 # (-1 heart, knocked away); a ground blast near him shoves him.
+TER = Terrain(GROUND, seed=SEED, bumps=5, amp=16)
 def meteor_pos(m, t):
     k = clamp((t - (m['t'] - FALL)) / FALL, 0, 1)
-    sx, sy = m['x'] + 520, HEAD - 150; ex, ey = m['x'], GROUND - m['r'] * 0.5
+    sx, sy = m['x'] + 520, HEAD - 150; ex, ey = m['x'], TER.y(m['x']) - m['r'] * 0.3
     return lerp(sx, ex, k * k), lerp(sy, ey, k * k)
 N0 = int(40 * FPS); GX, GYS, ROT, SQ, SHB = [], [], [], [], []
-ball = Ball(rng.uniform(320, 760), GROUND, R=R, seed=SEED, xmin=XMIN, xmax=XMAX)
+ball = Ball(rng.uniform(320, 760), TER, R=R, seed=SEED, xmin=XMIN, xmax=XMAX); TH = []
 hearts = 3; HITS = []; inv_until = -1; HEARTS = []; T_FAIL = None
-for m in MET: m['aim'] = rng.random() < 0.22; m['set'] = False; m['hit'] = False
+for m in MET: m['aim'] = rng.random() < 0.3; m['set'] = False; m['hit'] = False
 for f in range(N0):
     t = f / FPS
     live = T_FAIL is None and S.T_START <= t < S.T_END
@@ -50,12 +52,14 @@ for f in range(N0):
                 ball.push(nx * 650 + (-300 if mx > ball.x else 300), min(-500, ny * 900))
                 hearts -= 1; HITS.append(t); inv_until = t + 0.9
                 if hearts == 0: T_FAIL = t
+        if abs(m['t'] - t) < 0.5 / FPS:
+            TER.dig(m['x'], 55 if m['big'] else 38, m['r'] * 0.75)          # real crater in the sand
         if abs(m['t'] - t) < 0.5 / FPS and not m['hit']:
             dx = ball.x - m['x']
             if abs(dx) < m['r'] + 240 and ball.height() < 200:
                 k = 1 - max(0, abs(dx) - m['r']) / 240; ball.push((1 if dx >= 0 else -1) * 380 * k, -420 * k)
     ball.step(t)
-    GX.append(ball.x); GYS.append(ball.draw_y()); ROT.append(ball.rot); SQ.append(ball.sq); SHB.append((ball.x, ball.height()))
+    GX.append(ball.x); GYS.append(ball.y); ROT.append(0); SQ.append(0); SHB.append((ball.x, ball.height())); TH.append(TER.snapshot())
     HEARTS.append(hearts)
 S.OUTCOME = 'fail' if T_FAIL else 'win'
 S.T_RES = T_FAIL if T_FAIL else S.T_END
@@ -93,7 +97,7 @@ stars = [(rng.uniform(0, W), rng.uniform(HEAD, 1200), rng.uniform(1, 3), rng.uni
 dunes = [(rng.uniform(-100, W + 100), rng.uniform(140, 260)) for _ in range(6)]
 rocks = [(rng.uniform(40, W - 40), rng.uniform(GROUND + 40, H - 40), rng.uniform(10, 26)) for _ in range(18)]
 
-def draw_bg(c, t):
+def draw_bg(c, t, th):
     gr = cairo.LinearGradient(0, HEAD, 0, GROUND)
     gr.add_color_stop_rgb(0, *rgb('#1a0f33')); gr.add_color_stop_rgb(0.7, *rgb('#4a2357')); gr.add_color_stop_rgb(1, *rgb('#a2456a'))
     c.set_source(gr); c.rectangle(0, HEAD, W, GROUND - HEAD); c.fill()
@@ -109,21 +113,21 @@ def draw_bg(c, t):
     for i, (x, h) in enumerate(dunes):
         c.set_source_rgb(*rgb('#6d2f5e' if i % 2 else '#5c2852'))
         c.move_to(x - 420, GROUND); c.curve_to(x - 200, GROUND - h, x + 200, GROUND - h, x + 420, GROUND); c.close_path(); c.fill()
-    c.set_source_rgb(*rgb('#c4683f')); c.rectangle(0, GROUND, W, H - GROUND); c.fill()
+    gb = cairo.LinearGradient(0, GROUND - 30, 0, GROUND + 260); gb.add_color_stop_rgb(0, *rgb('#8f4a2c')); gb.add_color_stop_rgb(1, *rgb('#5a2a18'))
+    c.set_source(gb); c.rectangle(0, GROUND - 30, W, H - GROUND + 30); c.fill()   # crater back walls
+    TER.fill(c, th, '#d27445', '#7a3420', '#f09a63')
     for (x0, x1) in ((0, WALL_L), (WALL_R, W)):
         c.set_source_rgb(*rgb('#7a3b26')); c.move_to(x0, GROUND + 30); c.line_to(x0, 1050); c.curve_to(x0 + 20, 1000, x1 - 10, 1010, x1, 1080); c.line_to(x1, GROUND + 30); c.close_path(); c.fill()
         c.set_source_rgba(1, 0.75, 0.5, 0.18); c.rectangle((x1 - 14) if x0 == 0 else x0, 1090, 14, GROUND - 1090); c.fill()
         c.set_source_rgba(0, 0, 0, 0.18)
         for yy in range(1130, GROUND, 110): c.rectangle(x0 + 10, yy, x1 - x0 - 20, 8); c.fill()
-    c.set_source_rgb(*rgb('#e08a55')); c.rectangle(0, GROUND, W, 12); c.fill()
     for x, y, r in rocks:
+        if y < th[int(x)] + 25: continue
         c.set_source_rgb(*rgb('#9c4f30')); c.save(); c.translate(x, y); c.scale(1, 0.55); c.arc(0, 0, r, 0, 2 * math.pi); c.restore(); c.fill()
 
 def draw_craters(c, t):
     for m in MET:
         if m['t'] <= t and m['t'] <= S.T_RES + 0.3:
-            c.set_source_rgb(*rgb('#7a3a24')); c.save(); c.translate(m['x'], GROUND + 6); c.scale(1, 0.22); c.arc(0, 0, m['r'] * 0.95, 0, 2 * math.pi); c.restore(); c.fill()
-            c.set_source_rgb(*rgb('#5a2818')); c.save(); c.translate(m['x'], GROUND + 10); c.scale(1, 0.16); c.arc(0, 0, m['r'] * 0.6, 0, 2 * math.pi); c.restore(); c.fill()
             k = t - m['t']
             if k < 1.4:  # smoke
                 for j in range(5):
@@ -173,10 +177,10 @@ def render(f, c):
         if m['t'] <= t < m['t'] + 0.25 and m['t'] <= S.T_RES + 0.3:
             a = 14 if m['big'] else 9; shake = (rng.uniform(-a, a), rng.uniform(-a, a))
         if f == int(round(m['t'] * FPS)) and m['t'] <= S.T_RES + 0.3:
-            PS.spawn(m['x'], GROUND - 10, 26, (1, 0.6, 0.25), 750, 0.6, r=7); PS.spawn(m['x'], GROUND - 10, 16, (0.45, 0.3, 0.25), 520, 1.1, grav=1800, r=12)
+            PS.spawn(m['x'], TH[min(f, len(TH) - 1)][int(m['x'])] - 10, 26, (1, 0.6, 0.25), 750, 0.6, r=7); PS.spawn(m['x'], TH[min(f, len(TH) - 1)][int(m['x'])] - 10, 16, (0.45, 0.3, 0.25), 520, 1.1, grav=1800, r=12)
     c.save(); c.translate(*shake)
-    draw_bg(c, t); draw_craters(c, t); draw_warnings(c, t)
     fi = min(f, len(GX) - 1)
+    draw_bg(c, t, TH[fi]); draw_craters(c, t); draw_warnings(c, t)
     hits = [h for h in HITS if h <= t]
     flat = T_FAIL is not None and t >= T_FAIL
     if END.carried(t) or t >= END.T_GRAB:
@@ -185,17 +189,17 @@ def render(f, c):
         gx = GX[fi]; gy = GYS[fi]; sq = SQ[fi]; rot = ROT[fi]
         sx, sh = SHB[fi]; kk = 1 / (1 + sh / 220)
         sg = cairo.RadialGradient(0, 0, 0, 0, 0, 1); sg.add_color_stop_rgba(0, 0, 0, 0, 0.4 * kk); sg.add_color_stop_rgba(1, 0, 0, 0, 0)
-        c.save(); c.translate(sx, GROUND + 4); c.scale(R * 1.15 * (0.6 + 0.4 * kk), R * 0.22); c.set_source(sg); c.arc(0, 0, 1, 0, 2 * math.pi); c.restore(); c.fill()
+        c.save(); c.translate(sx, TER.y(sx) if False else TH[fi][int(clamp(sx, 0, W - 1))] + 2); c.scale(R * 1.15 * (0.6 + 0.4 * kk), R * 0.22); c.set_source(sg); c.arc(0, 0, 1, 0, 2 * math.pi); c.restore(); c.fill()
     blink = hits and t - hits[-1] < 0.5 and (t * 12) % 1 < 0.35 and not flat
     danger = any(m['t'] - WARN <= t < m['t'] and abs(m['x'] - GX[fi]) < 300 for m in MET)
     mood = 'happy' if (t >= S.T_END and S.OUTCOME == 'win') else ('scared' if danger or flat else 'worried')
     if not blink:
-        draw_blob(c, t, gx, gy, mood, sq, R=R, dizzy=flat and t > T_FAIL + 1.1, rot=rot)
+        draw_blob(c, t, gx, gy, mood, 0, R=R, dizzy=flat and t > T_FAIL + 0.4)
     draw_meteors(c, t)
     PS.draw(c)
     for h in hits:
         if h <= t < h + 0.7 and (T_FAIL is None or h < T_FAIL):
-            k = (t - h) / 0.7; text_at(c, '-1', GX[min(len(GX) - 1, int((h + 0.2) * FPS))] + 60, GY - 230 - 60 * k, 90, rgb('#ff4d6a'))
+            k = (t - h) / 0.7; text_at(c, '-1', GX[min(len(GX) - 1, int((h + 0.2) * FPS))] + 60, GYS[min(len(GYS) - 1, int((h + 0.2) * FPS))] - 140 - 60 * k, 80, rgb('#ff4d6a'))
     if hits and t - hits[-1] < 0.15:
         c.set_source_rgba(1, 0.1, 0.1, 0.25); c.rectangle(0, HEAD, W, H - HEAD); c.fill()
     END.draw_claw(c, t)
