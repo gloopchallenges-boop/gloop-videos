@@ -13,3 +13,9 @@
 | 2026-10-31 | Will Gloop survive the BUBBLING POTION? 🧪 Halloween special | cauldron (crypt, skin vampire) | BUBBLE % | Bouncing in bubble | Survived (claw grab at 0.0s) |
 | 2026-10-31 | Will Gloop survive the GRAVEYARD HANDS? 🪦 Halloween special | hands (graveyard, skin pumpkin) | WEB % | Wiggling in web | Survived (claw grab at 0.0s) |
 | 2026-10-31 | Will Gloop survive the SWAMP GHOST? 👻 Halloween special | ghost (swamp, skin mummy) | BROOM % | Wiggling on broom | Survived (claw grab at 0.0s) |
+| 2026-11-01 | Will Gloop stay unseen from the NIGHT OWL? 🦉 | Owl with lantern (moonlit forest, seed 1) | STEALTH – DETECTED % | Hopping between bush/stump/rock covers, peeking | Failed (spotted mid-hop 9.7s in, caged, claw collected) |
+| 2026-11-01 | Will Gloop survive the METEOR SHOWER? ☄️ | Meteors (alien desert, seed 5) | DODGE – HEARTS ❤❤❤ | Running from warning shadows | Survived (1 heart left, hits at 13.1s & 14.7s) |
+| 2026-11-01 | Will Gloop survive the BLIZZARD? ❄️ | Blizzard gusts + snow clumps (snowy mountain, seed 22) | TEMPERATURE – FREEZE % | Hopping back to the campfire after gusts | Survived comfortably (freeze ~37%) |
+| 2026-11-01 | Will Gloop survive the RISING LAVA? 🌋 | Rising lava, crumbling ledges (volcano, seed 13) | RISING DANGER – LAVA GAP m | Jumping ledge to ledge | Failed early (ledge crumbled 5.8s in, scorched & dizzy on lava, claw collected) |
+| 2026-11-01 | Will Gloop sneak past the SLEEPING DRAGON? 🐉 | Sleeping dragon (treasure cave, seed 9) | NOISE – WAKE % | Tiptoe hops over stone/boards/coins | Failed (coin clatter +45% at 7.7s, sooty & dizzy, claw collected) |
+| 2026-11-01 | Will Gloop survive the FALLING PIANO? 🎹 | Piano on chain (city sidewalk, seed 16) | FALLING OBJECT – CHAIN 7 LINKS | Wiggling free of bubblegum (FREE %) | Survived (free at 9.2s, piano crashed beside him 3s later) |
