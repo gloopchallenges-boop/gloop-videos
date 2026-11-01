@@ -224,6 +224,10 @@ Write the type in the history table's "Hazard bar" column, e.g. `STEALTH – DET
    **Hits must be real collisions**: transfer the object's momentum along the contact normal
    (capped, see `meteor_vel` in the reference) — never add an upward kick in mid-air (looks like
    he jumps by himself). Ground blasts only throw him when he's touching the ground.
+   **Every visible touch must count**: use a swept check (several sub-steps per frame — fast
+   objects move 100+ px per frame) with the full visible radii, apply the physical knock on every
+   touch (hearts/bar only change during the countdown), and show a small dust puff at the contact.
+   Verify in the sim that there are 0 uncounted visible overlaps.
    Step the ball once per frame INSIDE the sim and use `ball.x`/`ball.y` for every hit check.
    Reference with everything wired up: **`engine/scenarios/example_body_dodge.py`** (start new
    scenarios from it). (`Body` is obsolete; don't use it.)

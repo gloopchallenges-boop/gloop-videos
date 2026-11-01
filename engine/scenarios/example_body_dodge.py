@@ -17,12 +17,12 @@ GROUND = 1590; R = 58; GY = GROUND - R * 0.9; XMIN, XMAX = 165, 915; WALL_L, WAL
 WARN, FALL = 1.05, 0.75; SPEED = 760; HIT_R = 0.0
 
 # --- seeded meteors
-MET = []; t = 0.9; iv = 1.6
+MET = []; t = 0.9; iv = 1.85
 while t < S.T_END - 0.2:
     big = rng.random() < 0.25
     x = rng.uniform(150, 930) if t > S.T_START + 0.5 else rng.choice((rng.uniform(150, 300), rng.uniform(780, 930)))
     MET.append({'t': t, 'x': x, 'r': 120 if big else 85, 'big': big})
-    t += rng.uniform(0.55, 1.15) * iv; iv = max(0.8, iv * 0.96)
+    t += rng.uniform(0.55, 1.15) * iv; iv = max(0.95, iv * 0.96)
 
 # --- simulate: Gloop is a passive bouncy ball (Ball) — he keeps bouncing the same way and only
 # changes direction when he hits a rock wall or something hits him. Meteors fall at random spots
@@ -40,7 +40,9 @@ def meteor_pos(m, t):
 N0 = int(40 * FPS); GX, GYS, ROT, SQ, SHB = [], [], [], [], []
 ball = Ball(rng.uniform(320, 760), TER, R=R, seed=SEED, xmin=XMIN, xmax=XMAX); TH = []
 hearts = 3; HITS = []; inv_until = -1; HEARTS = []; T_FAIL = None
-for m in MET: m['aim'] = rng.random() < 0.24; m['set'] = False; m['hit'] = False
+for m in MET: m['aim'] = rng.random() < 0.21; m['set'] = False; m['hit'] = False
+CONTACTS = []   # (t, x, y) every physical meteor-Gloop contact (drawn as a dust puff)
+SUB = 10        # swept collision: meteors move ~170 px/frame near the ground, so check 10x per frame
 for f in range(N0):
     t = f / FPS
     live = T_FAIL is None and S.T_START <= t < S.T_END
@@ -48,23 +50,31 @@ for f in range(N0):
         if not m['set'] and t >= m['t'] - WARN:
             if m['aim'] and t > S.T_START - 0.3: m['x'] = clamp(ball.x + rng.uniform(-60, 60), 150, 930)
             m['set'] = True
-        if m['t'] - FALL <= t < m['t'] and not m['hit']:
-            mx, my = meteor_pos(m, t)
-            d = math.hypot(ball.x - mx, ball.y - my)
-            if d < m['r'] * 0.62 + R * 0.7 and live and t > inv_until:
-                m['hit'] = True; nx, ny = (ball.x - mx) / (d or 1), (ball.y - my) / (d or 1)
-                vmx, vmy = meteor_vel(m, t)       # real collision: heavy rock transfers momentum along the contact normal
-                rel = (vmx - ball.vx) * nx + (vmy - ball.vy) * ny
-                if rel > 0: j = min(1.3 * rel, 900); ball.vx += j * nx; ball.vy += j * ny
-                hearts -= 1; HITS.append(t); inv_until = t + 0.9
-                if hearts == 0: T_FAIL = t
         if abs(m['t'] - t) < 0.5 / FPS:
             TER.dig(m['x'], 55 if m['big'] else 38, m['r'] * 0.75)          # real crater in the sand
         if abs(m['t'] - t) < 0.5 / FPS and not m['hit']:
             dx = ball.x - m['x']
             if abs(dx) < m['r'] + 240 and ball.height() < 25:   # ground blast only throws him if he's touching the ground
                 k = 1 - max(0, abs(dx) - m['r']) / 240; ball.push((1 if dx >= 0 else -1) * 380 * k, -420 * k)
+    px, py = ball.x, ball.y
     ball.step(t)
+    for m in MET:   # every visible touch is a real collision (momentum along the contact normal)
+        if m['hit'] or not (m['t'] - FALL - 1 / FPS <= t < m['t']): continue
+        for k in range(1, SUB + 1):
+            ts = t - 1 / FPS + k / (SUB * FPS)
+            if ts < m['t'] - FALL: continue
+            mx, my = meteor_pos(m, ts); bx, by = lerp(px, ball.x, k / SUB), lerp(py, ball.y, k / SUB)
+            d = math.hypot(bx - mx, by - my)
+            if d < m['r'] * 0.62 + R * 0.95:
+                m['hit'] = True; nx, ny = (bx - mx) / (d or 1), (by - my) / (d or 1)
+                vmx, vmy = meteor_vel(m, ts)
+                rel = (vmx - ball.vx) * nx + (vmy - ball.vy) * ny
+                if rel > 0: j = min(1.3 * rel, 900); ball.vx += j * nx; ball.vy += j * ny
+                CONTACTS.append((ts, bx - nx * R, by - ny * R))
+                if live:
+                    hearts -= 1; HITS.append(ts)
+                    if hearts == 0: T_FAIL = ts
+                break
     GX.append(ball.x); GYS.append(ball.y); ROT.append(0); SQ.append(0); SHB.append((ball.x, ball.height())); TH.append(TER.snapshot())
     HEARTS.append(hearts)
 S.OUTCOME = 'fail' if T_FAIL else 'win'
@@ -178,6 +188,8 @@ def render(f, c):
     if not blink:
         draw_blob(c, t, gx, gy, mood, 0, R=R, dizzy=flat and t > T_FAIL + 0.4)
     draw_meteors(c, t)
+    for (tc, cx, cy) in CONTACTS:
+        if abs(t - tc) < 0.5 / FPS: PS.spawn(cx, cy, 14, (0.5, 0.4, 0.34), 380, 0.5, grav=600, r=7)
     PS.draw(c)
     END.draw_claw(c, t)
     c.restore()
