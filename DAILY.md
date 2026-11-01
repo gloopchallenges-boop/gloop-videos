@@ -138,11 +138,9 @@ Write the type in the history table's "Hazard bar" column, e.g. `STEALTH – DET
   medium, only occasionally a nail-biter. Fails: some early and sudden (a big unlucky hit at
   9s), some mid-way, only occasionally at the very end. Max **1 in 5** videos may be decided
   in the last second.
-- **Gloop is not psychic.** He must never "know" where the danger lands: he wanders on his own,
-  notices a threat only sometimes (random delay, sometimes panics the wrong way or freezes), and
-  hazards partly aim at where he *is* (not where he'll be) and partly land at random. A dodge has
-  to come from luck + his real physical position, never from a perfect last-moment reaction.
-  Hits and near misses physically knock him around (`body.push`). See `example_body_dodge.py`.
+- **Gloop has no mind.** He's a bouncing ball: the hazards come at random (some aim at where he
+  *is*), and whether they hit depends only on his physical bounce path. Never a "perfect dodge".
+  Balance difficulty with the hazard (count, size, aim rate), not by steering Gloop.
 - **No convenient coincidences.** The bar should never sit at 1–3% for ages, the threat
   shouldn't conveniently miss at the last instant, and nothing breaks "just after" the
   rescue. When Gloop wins, the claw just picks him up — the hazard stays intact.
@@ -212,13 +210,15 @@ Write the type in the history table's "Hazard bar" column, e.g. `STEALTH – DET
    win/fail mix, then render. **New scenarios: `S.T_START = HOOK_T`, timer 11–15 s, hazard in
    motion from t=0.** (The 2026-11-01 files still use the old 2.6 s hook / 15–16 s timer.)
    `engine/examples/` holds the older standalone references.
-   **Gloop must move physically, never on a fixed path** (scripted glides/identical hops look
-   fake): drive him with `Body` from `gloop_common.py` — gravity, random hop heights/lengths,
-   rolls (body + face spin with distance, overshoot, settle upright), random flips, squash on
-   landing, fidgety idle hops/shuffles, `body.push()` for shoves. Step the body once per frame
-   INSIDE the sim and use `body.x`/`body.y` for every hit/detection check; draw with
-   `draw_blob(..., b.sq, rot=b.rot)` at `b.draw_y()`. Reference with everything wired up:
-   **`engine/scenarios/example_body_dodge.py`** (start new scenarios from it).
+   **Gloop is a passive bouncy jelly ball, not a character with a mind.** Use `Ball` from
+   `gloop_common.py`: he bounces steadily in ONE direction (spinning as he rolls) and changes
+   direction/speed ONLY when something physically interferes — a wall, a falling object, a blast,
+   a gust, a push (`ball.push`). Extra energy from a hit dies out over a few bounces. He never
+   steers, wanders, aims, dodges or reacts on purpose (only his face shows emotion). Scenes need
+   visible walls/edges he bounces off. Step the ball once per frame INSIDE the sim and use
+   `ball.x`/`ball.y` for every hit/detection check; draw with `draw_blob(..., b.sq, rot=b.rot)` at
+   `b.draw_y()`. Reference with everything wired up: **`engine/scenarios/example_body_dodge.py`**
+   (start new scenarios from it). (`Body` — a steering version — is obsolete; don't use it.)
 4. **Check frames before rendering**: render ~8 stills at key moments
    (`python3 scenario.py out/st events.json 1,4,9,13,16.5,17.6,19,21`), tile them and LOOK
    at them. Fix anything broken (things off-screen, overlapping text, wrong timing).

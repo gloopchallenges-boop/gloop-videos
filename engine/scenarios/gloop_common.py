@@ -207,6 +207,47 @@ class Body:
     def draw_y(self): return self.y + self.R * max(0, self.sq) * 0.9
 
 
+class Ball:
+    """Gloop as a passive bouncy jelly ball — no mind, no steering. He keeps bouncing in the same
+    direction at a steady rhythm; direction/speed change ONLY from collisions: walls (xmin/xmax),
+    things that hit him, blasts (ball.push). Extra energy from a hit dies out over a few bounces,
+    then he settles back to his normal bounce. Spin comes from ground contact (rolls with vx).
+    Step once per frame inside the sim; use ball.x / ball.y for every collision / hit check.
+    Draw: contact_shadow(c, b); draw_blob(c, t, b.x, b.draw_y(), mood, b.sq, R=b.R, rot=b.rot)"""
+    G = 2600.0
+    def __init__(self, x, ground, R=80, seed=1, vx=None, hop=None, xmin=None, xmax=None, e_wall=0.92):
+        rng = random.Random(seed * 104729 + 7); self.R = R; self.ground = ground
+        self.vx = vx if vx is not None else rng.choice((-1, 1)) * rng.uniform(220, 360)
+        self.base_v = abs(self.vx); self.base_h = hop if hop is not None else rng.uniform(100, 180)
+        self.x = x; self.y = self.gy(x) - R - self.base_h * rng.uniform(0.2, 1.0); self.vy = 0.0
+        self.xmin = R + 10 if xmin is None else xmin; self.xmax = W - R - 10 if xmax is None else xmax
+        self.e_wall = e_wall; self.rot = 0.0; self.w = self.vx / R; self.sq = 0.0; self.vsq = 0.0
+        self.landings = []; self.walls = []; self.frozen = False
+    def gy(self, x): return self.ground(x) if callable(self.ground) else self.ground
+    def height(self): return max(0.0, self.gy(self.x) - self.R - self.y)
+    def push(self, vx, vy):
+        self.vx += vx; self.vy = min(self.vy + vy, vy); self.w += vx / self.R * 0.8; self.vsq -= 2.0
+    def step(self, t, dt=1 / FPS):
+        if self.frozen: return self.x, self.y
+        R = self.R
+        self.vy += self.G * dt; self.x += self.vx * dt; self.y += self.vy * dt
+        if self.x < self.xmin: self.x = self.xmin; self.vx = abs(self.vx) * self.e_wall; self.vsq -= 3.0; self.w = -self.w * 0.5; self.walls.append(t)
+        if self.x > self.xmax: self.x = self.xmax; self.vx = -abs(self.vx) * self.e_wall; self.vsq -= 3.0; self.w = -self.w * 0.5; self.walls.append(t)
+        gy = self.gy(self.x)
+        if self.y >= gy - R and self.vy > 0:
+            h_now = self.vy ** 2 / (2 * self.G)
+            imp = min(0.4, self.vy / 3000); self.vsq += imp * 22; self.landings.append((t, self.x, imp))
+            h_new = max(self.base_h, h_now * 0.62) if h_now > self.base_h * 1.05 else self.base_h
+            self.y = gy - R; self.vy = -math.sqrt(2 * self.G * h_new)
+            if abs(self.vx) > self.base_v * 1.05: self.vx *= 0.8          # extra speed from a hit dies out
+            elif abs(self.vx) < self.base_v * 0.95: self.vx = math.copysign(min(self.base_v, abs(self.vx) / 0.8 if self.vx else self.base_v), self.vx or 1)
+            self.w = self.vx / R                                               # ground contact sets the roll spin
+        self.rot += self.w * dt
+        self.vsq += (-self.sq * 240 - self.vsq * 11) * dt; self.sq = clamp(self.sq + self.vsq * dt, -0.3, 0.42)
+        return self.x, self.y
+    def draw_y(self): return self.y + self.R * max(0, self.sq) * 0.9
+
+
 def contact_shadow(c, b, alpha=0.35):
     """Soft ground shadow under a Body: shrinks/fades as he goes up — sells height & weight."""
     h = b.height(); k = 1 / (1 + h / 220)

@@ -12,62 +12,65 @@ rng = random.Random(SEED)
 class S: pass
 S.HOOK2 = 'THE METEOR SHOWER?'; S.HOOK2_SIZE = 86; S.FAIL_WORD = 'SQUASHED!'; S.FAIL_SIZE = 140
 S.T_START = HOOK_T; S.TL = 13.0; S.T_END = S.T_START + S.TL
-GROUND = 1590; R = 80; GY = GROUND - R * 0.9; XMIN, XMAX = 130, 950
+GROUND = 1590; R = 80; GY = GROUND - R * 0.9; XMIN, XMAX = 165, 915; WALL_L, WALL_R = XMIN - R, XMAX + R
 WARN, FALL = 1.05, 0.75; SPEED = 760; HIT_R = 0.0
 
 # --- seeded meteors
-MET = []; t = 0.9; iv = 1.45
+MET = []; t = 0.9; iv = 1.9
 while t < S.T_END - 0.2:
     big = rng.random() < 0.25
     x = rng.uniform(150, 930) if t > S.T_START + 0.5 else rng.choice((rng.uniform(150, 300), rng.uniform(780, 930)))
     MET.append({'t': t, 'x': x, 'r': 120 if big else 85, 'big': big})
-    t += rng.uniform(0.55, 1.15) * iv; iv = max(0.8, iv * 0.96)
+    t += rng.uniform(0.55, 1.15) * iv; iv = max(1.05, iv * 0.96)
 
-# --- simulate: Gloop is NOT psychic. He wanders on his own, only sometimes notices a meteor (after a
-# random delay, sometimes panicking the wrong way); ~40% of meteors are aimed at where he is when they
-# appear, the rest land anywhere. Blasts knock him back; a hit launches him tumbling.
+# --- simulate: Gloop is a passive bouncy ball (Ball) — he keeps bouncing the same way and only
+# changes direction when he hits a rock wall or something hits him. Meteors fall at random spots
+# (~30% aimed at where he is when they appear). A meteor touching him on the way down = hit
+# (-1 heart, knocked away); a ground blast near him shoves him.
+def meteor_pos(m, t):
+    k = clamp((t - (m['t'] - FALL)) / FALL, 0, 1)
+    sx, sy = m['x'] + 520, HEAD - 150; ex, ey = m['x'], GROUND - m['r'] * 0.5
+    return lerp(sx, ex, k * k), lerp(sy, ey, k * k)
 N0 = int(40 * FPS); GX, GYS, ROT, SQ, SHB = [], [], [], [], []
-body = Body(rng.uniform(300, 780), GROUND, R=R, seed=SEED, speed=SPEED, xmin=XMIN, xmax=XMAX)
-target = body.x; next_wander = 0.0; hearts = 3; HITS = []; inv_until = -1; HEARTS = []; T_FAIL = None
-for m in MET:
-    m['aim'] = rng.random() < 0.28; m['notice'] = rng.random() < 0.7
-    m['delay'] = rng.uniform(0.25, 0.85); m['panic'] = rng.random() < 0.2; m['set'] = False
+ball = Ball(rng.uniform(320, 760), GROUND, R=R, seed=SEED, xmin=XMIN, xmax=XMAX)
+hearts = 3; HITS = []; inv_until = -1; HEARTS = []; T_FAIL = None
+for m in MET: m['aim'] = rng.random() < 0.22; m['set'] = False; m['hit'] = False
 for f in range(N0):
     t = f / FPS
-    if t >= next_wander and T_FAIL is None:            # wander around on his own
-        target = clamp(body.x + rng.uniform(-380, 380), XMIN, XMAX); next_wander = t + rng.uniform(1.2, 3.2)
+    live = T_FAIL is None and S.T_START <= t < S.T_END
     for m in MET:
-        if not m['set'] and t >= m['t'] - WARN:          # meteor appears: aimed ones target his position now
-            if m['aim'] and t > S.T_START - 0.3: m['x'] = clamp(body.x + rng.uniform(-70, 70), 150, 930)
+        if not m['set'] and t >= m['t'] - WARN:
+            if m['aim'] and t > S.T_START - 0.3: m['x'] = clamp(ball.x + rng.uniform(-60, 60), 150, 930)
             m['set'] = True
-        if m['set'] and m['notice'] and T_FAIL is None and abs(t - (m['t'] - WARN + m['delay'])) < 0.5 / FPS and t < m['t']:
-            side = (1 if body.x >= m['x'] else -1) * (-1 if m['panic'] else 1)
-            target = clamp(m['x'] + side * (m['r'] + rng.uniform(150, 320)), XMIN, XMAX); next_wander = t + rng.uniform(1.0, 2.0)
-        if abs(m['t'] - t) < 0.5 / FPS:
-            d = body.x - m['x']; away = 1 if d >= 0 else -1
-            live = T_FAIL is None and S.T_START <= t < S.T_END
-            m['hit'] = live and abs(d) < m['r'] + R * 0.55 and body.height() < 140 and t > inv_until
-            if m['hit']:
-                body.push(away * rng.uniform(500, 800), -rng.uniform(900, 1200)); hearts -= 1; HITS.append(t); inv_until = t + 0.9
+        if m['t'] - FALL <= t < m['t'] and not m['hit']:
+            mx, my = meteor_pos(m, t)
+            d = math.hypot(ball.x - mx, ball.y - my)
+            if d < m['r'] * 0.62 + R * 0.7 and live and t > inv_until:
+                m['hit'] = True; nx, ny = (ball.x - mx) / (d or 1), (ball.y - my) / (d or 1)
+                ball.push(nx * 650 + (-300 if mx > ball.x else 300), min(-500, ny * 900))
+                hearts -= 1; HITS.append(t); inv_until = t + 0.9
                 if hearts == 0: T_FAIL = t
-            elif abs(d) < m['r'] + 260 and T_FAIL is None:   # near miss: blast shove
-                k = 1 - (abs(d) - m['r']) / 260; body.push(away * 420 * k, -380 * k)
-    body.step(t, target, active=T_FAIL is None and t < S.T_END + 0.3)
-    GX.append(body.x); GYS.append(body.draw_y()); ROT.append(body.rot); SQ.append(body.sq); SHB.append((body.x, body.height()))
+        if abs(m['t'] - t) < 0.5 / FPS and not m['hit']:
+            dx = ball.x - m['x']
+            if abs(dx) < m['r'] + 240 and ball.height() < 200:
+                k = 1 - max(0, abs(dx) - m['r']) / 240; ball.push((1 if dx >= 0 else -1) * 380 * k, -420 * k)
+    ball.step(t)
+    GX.append(ball.x); GYS.append(ball.draw_y()); ROT.append(ball.rot); SQ.append(ball.sq); SHB.append((ball.x, ball.height()))
     HEARTS.append(hearts)
 S.OUTCOME = 'fail' if T_FAIL else 'win'
 S.T_RES = T_FAIL if T_FAIL else S.T_END
 S.GRAB = (540, GROUND - R)
 END = S.END = Ending(S)
-gi = min(int(END.T_GRAB * FPS), N0 - 1); S.GRAB = (GX[gi], GYS[gi] + 25)
+gi = min(int(END.T_GRAB * FPS), N0 - 1); S.GRAB = (GX[gi], GYS[gi])
 S.events = [[S.T_START + 0.1, 'rumble', 1.2]]
 for m in MET:
     if m['t'] - FALL < S.T_RES + 0.3: S.events.append([m['t'] - FALL, 'whoosh'])
-    if m['t'] <= S.T_RES + 0.3:
-        S.events.append([m['t'], 'crash'])
-        if m.get('hit'): S.events.append([m['t'] + 0.05, 'heart'])
-for (tl, xl, imp) in body.landings:
-    if tl < S.T_RES + 1.0 and imp > 0.06: S.events.append([tl, 'thump', min(0.6, imp * 2)])
+    if m['t'] <= S.T_RES + 0.3: S.events.append([m['t'], 'crash'])
+for h in HITS: S.events.append([h, 'heart']); S.events.append([h, 'thump', 0.8])
+for (tl, xl, imp) in ball.landings:
+    if tl < S.T_RES + 1.5: S.events.append([tl, 'hop'])
+for tw in ball.walls:
+    if tw < S.T_RES + 1.5: S.events.append([tw, 'thump', 0.4])
 S.AMB = {'drone': 48, 'wind': 0.025}
 
 def draw_bar(c, t, f):
@@ -107,6 +110,11 @@ def draw_bg(c, t):
         c.set_source_rgb(*rgb('#6d2f5e' if i % 2 else '#5c2852'))
         c.move_to(x - 420, GROUND); c.curve_to(x - 200, GROUND - h, x + 200, GROUND - h, x + 420, GROUND); c.close_path(); c.fill()
     c.set_source_rgb(*rgb('#c4683f')); c.rectangle(0, GROUND, W, H - GROUND); c.fill()
+    for (x0, x1) in ((0, WALL_L), (WALL_R, W)):
+        c.set_source_rgb(*rgb('#7a3b26')); c.move_to(x0, GROUND + 30); c.line_to(x0, 1050); c.curve_to(x0 + 20, 1000, x1 - 10, 1010, x1, 1080); c.line_to(x1, GROUND + 30); c.close_path(); c.fill()
+        c.set_source_rgba(1, 0.75, 0.5, 0.18); c.rectangle((x1 - 14) if x0 == 0 else x0, 1090, 14, GROUND - 1090); c.fill()
+        c.set_source_rgba(0, 0, 0, 0.18)
+        for yy in range(1130, GROUND, 110): c.rectangle(x0 + 10, yy, x1 - x0 - 20, 8); c.fill()
     c.set_source_rgb(*rgb('#e08a55')); c.rectangle(0, GROUND, W, 12); c.fill()
     for x, y, r in rocks:
         c.set_source_rgb(*rgb('#9c4f30')); c.save(); c.translate(x, y); c.scale(1, 0.55); c.arc(0, 0, r, 0, 2 * math.pi); c.restore(); c.fill()
@@ -129,7 +137,7 @@ def draw_warnings(c, t):
             gr = cairo.RadialGradient(0, 0, 0, 0, 0, 1)
             gr.add_color_stop_rgba(0, 1, 0.45, 0.1, 0.22 * k); gr.add_color_stop_rgba(1, 1, 0.4, 0.1, 0)
             c.save(); c.translate(m['x'], GROUND + 4); c.scale(m['r'] * (2.6 - 1.2 * k), 70); c.set_source(gr); c.arc(0, 0, 1, 0, 2 * math.pi); c.restore(); c.fill()
-            c.set_source_rgba(0, 0, 0, 0.3 * k); c.save(); c.translate(m['x'], GROUND + 6); c.scale(m['r'] * (0.5 + 0.5 * k), 14 * (0.5 + 0.5 * k)); c.arc(0, 0, 1, 0, 2 * math.pi); c.restore(); c.fill()
+            c.set_source_rgba(0, 0, 0, 0.13 * k); c.save(); c.translate(m['x'], GROUND + 6); c.scale(m['r'] * (0.5 + 0.5 * k), 14 * (0.5 + 0.5 * k)); c.arc(0, 0, 1, 0, 2 * math.pi); c.restore(); c.fill()
         if m['t'] <= t < m['t'] + 0.5 and m['t'] <= S.T_RES + 0.3:   # shock ring
             k = (t - m['t']) / 0.5
             c.set_source_rgba(1, 0.85, 0.6, 0.6 * (1 - k)); c.set_line_width(10 * (1 - k) + 2)
@@ -138,9 +146,8 @@ def draw_warnings(c, t):
 def draw_meteors(c, t):
     for m in MET:
         if m['t'] - FALL <= t < m['t'] and m['t'] <= S.T_RES + 0.3:
-            k = (t - (m['t'] - FALL)) / FALL
             sx, sy = m['x'] + 520, HEAD - 150; ex, ey = m['x'], GROUND - m['r'] * 0.5
-            x, y = lerp(sx, ex, k * k), lerp(sy, ey, k * k)
+            x, y = meteor_pos(m, t)
             ang = math.atan2(ey - sy, ex - sx)
             r = m['r'] * 0.62
             c.save(); c.translate(x, y); c.rotate(ang)
@@ -172,8 +179,8 @@ def render(f, c):
     fi = min(f, len(GX) - 1)
     hits = [h for h in HITS if h <= t]
     flat = T_FAIL is not None and t >= T_FAIL
-    if END.carried(t):
-        gx, gy = END.carry_xy(t); gy += 20; sq = 0.0; rot = 0
+    if END.carried(t) or t >= END.T_GRAB:
+        gx, gy = (END.carry_xy(t) if END.carried(t) else END.S.GRAB); gy += (0 if t < END.T_LIFT else 0); sq = 0.0; rot = ROT[min(fi, int(END.T_GRAB * FPS))]
     else:
         gx = GX[fi]; gy = GYS[fi]; sq = SQ[fi]; rot = ROT[fi]
         sx, sh = SHB[fi]; kk = 1 / (1 + sh / 220)
