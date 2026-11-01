@@ -68,7 +68,7 @@ queue/YYYY-MM-DD/meta.json
   Make uploads everything at 12:00 as scheduled-private; YouTube publishes each at its time
   (immediately if the time has passed).
 - Only list files that actually exist and finished correctly.
-- Videos: 1080x1920, 30 fps, H.264 yuv420p, AAC, `-movflags +faststart`, **18–30 s**,
+- Videos: 1080x1920, 30 fps, H.264 yuv420p, AAC, `-movflags +faststart`, **18–22 s** (min 18, aim ~18–20 — shorter = higher % watched),
   **file size under 4.5 MB** (Make free plan limit is 5 MB; use `-crf 24`, raise if needed).
 - Must be on `main` and pushed **before 11:50 Warsaw time**.
 
@@ -152,7 +152,10 @@ Write the type in the history table's "Hazard bar" column, e.g. `STEALTH – DET
 - **Gloop**: orange jelly blob (see `engine/examples/croc_rope_timer.py` → `draw_blob`),
   moods `worried` / `scared` / `happy`. Never use any existing brand or character.
 - **Header** (top 330 px, near-black `#0d0b14`, Poppins Bold with black outline):
-  - first ~2.6 s: hook text `WILL GLOOP SURVIVE` / `<THE THREAT>?`
+  - first **1.5 s** (`HOOK_T`): hook text `WILL GLOOP SURVIVE` / `<THE THREAT>?` shown **over action
+    that is already moving from frame 0** (meteor already falling, beam already sweeping, lava
+    already bubbling) — never a calm/static opening; that's where viewers swipe away. Hazard
+    events before `T_START` must not affect the bar (e.g. pre-start meteors land far from Gloop).
   - then `SURVIVE: 12.4s` countdown (white → yellow <5s → red <2s, pulse each second)
     plus a hazard bar under it (e.g. `ROPE 63%`, `ICE 40%`, `OXYGEN 22%`, `SHIELD 51%`).
 - **Mechanic**: the timer races the hazard bar. Each Gloop action (bounce, wiggle, jump,
@@ -164,6 +167,15 @@ Write the type in the history table's "Hazard bar" column, e.g. `STEALTH – DET
   About HALF of the videos Gloop **fails** (see Outcomes above): keep it cartoony and non-gory
   (e.g. croc gulps him and spits him out dizzy, he gets frozen in an ice cube, launched
   off-screen) → header `GLOOP FAILED!` → claw still collects him → same outro.
+  **Keep the ending short** (~3.8 s from result to the last frame: claw in at +0.6 s, outro at
+  +2.3 s).
+- **Engagement features (automatic in `engine/scenarios/gloop_common.py`, keep them on):**
+  - **Guess prompt**: `SURVIVE OR FAIL?` / `COMMENT YOUR GUESS!` panel ~2.2 s after the timer
+    starts, for 1.8 s (skipped automatically if the result comes too soon after it).
+  - **Record badge**: top-left `GLOOP RECORD 11W - 6L`, counted from `history.md`; it ticks up
+    (+1 W or +1 L) when the result text appears. So **append each video's history row right
+    after building it** — then the next video's record includes it (or set env `RECORD=W-L`).
+  - **Seamless loop**: the last 0.4 s crossfade into frame 0, so the Short loops (rewatches).
 - **Voice** (Kokoro TTS, voice `am_michael`, speed 1.0) — ONLY two lines:
   `"Will Gloop survive <the threat>?"` at 0.2 s and `"See you next challenge!"` at the outro.
   No other narration, no commentary.
@@ -172,7 +184,7 @@ Write the type in the history table's "Hazard bar" column, e.g. `STEALTH – DET
   nothing copyrighted, nothing harsh/buzzy.
 - **Variety**: never repeat a threat+hazard combo listed in `history.md`. Vary setting
   (jungle night, volcano, ocean, factory, ice cave, space, kitchen…), timer length
-  (10–20 s), threat, hazard, Gloop's action and the outcome.
+  (11–15 s), threat, hazard, Gloop's action and the outcome.
 
 ## How to build (follow every time)
 
@@ -184,10 +196,17 @@ Write the type in the history table's "Hazard bar" column, e.g. `STEALTH – DET
    ```
    Font: Poppins Bold (`fc-list | grep -i poppins`); if missing, use DejaVu Sans Bold.
 2. Read `history.md`. Check if today is a special day. Pick 3 (or 10) new challenges.
-3. Copy `engine/examples/croc_rope_timer.py` as a starting point for each scenario,
-   change the scene/threat/hazard/mechanic. Keep helpers (`draw_blob`, `text_center`,
-   claw, header layout). Write each scenario's sfx script like
-   `engine/examples/croc_rope_timer_sfx.py` driven by the events JSON the renderer writes.
+3. Build every scenario on the shared engine `engine/scenarios/gloop_common.py` (blob, header,
+   claw ending, record badge, guess prompt, loop crossfade, `run()`), with
+   `engine/scenarios/gloop_sfx.py` (generic event-driven sfx) and
+   `engine/scenarios/gloop_build.sh <scenario.py> <out.mp4>` (render + sfx + voice + mix + size
+   check; set `SEED=` env). Good templates, one per type: `engine/scenarios/2026-11-01_v3.py`
+   (stealth), `_v4` (dodge hearts), `_v5` (temperature), `_v6` (rising danger), `_v7`
+   (noise/wake), `_v8` (falling object). Each defines `SAY = '<the threat>'`, a seeded sim, and
+   prints a summary with `python3 scenario.py sim x` — scan seeds with that to get the day's
+   win/fail mix, then render. **New scenarios: `S.T_START = HOOK_T`, timer 11–15 s, hazard in
+   motion from t=0.** (The 2026-11-01 files still use the old 2.6 s hook / 15–16 s timer.)
+   `engine/examples/` holds the older standalone references.
 4. **Check frames before rendering**: render ~8 stills at key moments
    (`python3 scenario.py out/st events.json 1,4,9,13,16.5,17.6,19,21`), tile them and LOOK
    at them. Fix anything broken (things off-screen, overlapping text, wrong timing).

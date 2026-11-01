@@ -6,9 +6,31 @@ Scene must provide: DUR, T_START, T_END, T_RES (time challenge resolved), OUTCOM
    optional FAIL_WORD (big word shown at failure, e.g. 'SPOTTED!'), gloop_carry(c, t) to draw
    Gloop hanging from the claw after the lift (default: blob under claw).
 """
-import cairo, math, random, subprocess, sys, json
+import cairo, math, random, subprocess, sys, json, os, re
+import numpy as np
 
 W, H, FPS, HEAD = 1080, 1920, 30, 330
+HOOK_T = 1.5      # hook length: use S.T_START = HOOK_T (hazard must already be in motion from frame 0)
+MIN_DUR = 18.0    # every video >= 18 s (YouTube job contract)
+LOOP_T = 0.4      # last 0.4 s crossfade back into frame 0 so the Short loops seamlessly
+GUESS_AT, GUESS_LEN = 2.2, 1.8   # 'SURVIVE OR FAIL?' prompt, seconds after T_START
+
+def gloop_record():
+    """Gloop's W-L record before this video: env RECORD='W-L' or counted from history.md
+    (rows whose Outcome starts with Survived/Failed). Append each video's history row right after
+    building it so the next video's record includes it."""
+    if os.environ.get('RECORD'):
+        w, l = os.environ['RECORD'].split('-'); return int(w), int(l)
+    hp = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'history.md')
+    w = l = 0
+    try:
+        for line in open(hp):
+            cells = [x.strip() for x in line.strip().strip('|').split('|')]
+            if len(cells) >= 6 and re.match(r'\d{4}-\d\d-\d\d', cells[0]):
+                if cells[-1].lower().startswith('survived'): w += 1
+                elif cells[-1].lower().startswith('failed'): l += 1
+    except OSError: pass
+    return w, l
 
 def ease(x): x = max(0, min(1, x)); return x * x * (3 - 2 * x)
 def lerp(a, b, k): return a + (b - a) * k
@@ -144,14 +166,43 @@ class Ending:
     """Claw + header timing after the challenge resolves at T_RES."""
     def __init__(self, S):
         self.S = S; r = S.T_RES
-        pad = max(0.0, 19.0 - (r + 5.4))   # keep every video >= 19 s: hold the result a bit longer
-        self.T_TEXT = r + 0.8
-        self.T_CLAW_IN = r + 1.0 + pad
-        self.T_GRAB = r + 2.0 + pad
-        self.T_LIFT = r + 2.3 + pad
-        self.T_GONE = r + 4.0 + pad
-        self.T_OUTRO = r + 3.1 + pad
-        S.DUR = round(r + 5.4 + pad, 2)
+        pad = max(0.0, MIN_DUR - (r + 3.8))   # short ending; hold the result longer only if needed for MIN_DUR
+        self.T_TEXT = r + 0.7
+        self.T_CLAW_IN = r + 0.6 + pad * 0.5
+        self.T_GRAB = r + 1.3 + pad * 0.5
+        self.T_LIFT = r + 1.5 + pad
+        self.T_GONE = r + 2.9 + pad
+        self.T_OUTRO = r + 2.3 + pad
+        S.DUR = round(r + 3.8 + pad, 2)
+        self.REC = gloop_record()
+        g0 = S.T_START + GUESS_AT
+        self.T_GUESS = g0 if S.T_RES > g0 + GUESS_LEN + 0.6 else None
+    def overlay(self, c, t):
+        """Drawn on top of every frame: record badge + mid-video guess prompt."""
+        S = self.S; w, l = self.REC; pop = 0.0
+        if t >= self.T_TEXT:
+            if S.OUTCOME == 'win': w += 1
+            else: l += 1
+            pop = max(0.0, 1 - (t - self.T_TEXT) / 0.4)
+        font(c, 34); s1 = 'GLOOP RECORD'; s2 = f'{w}W - {l}L'
+        e1 = c.text_extents(s1); font(c, 44); e2 = c.text_extents(s2)
+        bw = max(e1.x_advance, e2.x_advance) + 40
+        c.save(); c.translate(24, HEAD + 22); c.scale(1 + 0.25 * pop, 1 + 0.25 * pop)
+        c.set_source_rgba(0.05, 0.04, 0.08, 0.72); rrect(c, 0, 0, bw, 104, 22); c.fill()
+        c.set_source_rgb(*(rgb('#7dff8a') if pop and S.OUTCOME == 'win' else rgb('#ff4d4d') if pop else rgb('#ffd36b'))); c.set_line_width(4); rrect(c, 0, 0, bw, 104, 22); c.stroke()
+        c.restore()
+        text_at(c, s1, 24 + bw / 2, HEAD + 22 + 30, 30, (0.85, 0.85, 0.9), 1 + 0.25 * pop, lw=6)
+        text_at(c, s2, 24 + bw / 2, HEAD + 22 + 72, 44, (1, 1, 1), 1 + 0.25 * pop, lw=7)
+        if self.T_GUESS is not None and self.T_GUESS <= t < self.T_GUESS + GUESS_LEN:
+            k = (t - self.T_GUESS) / GUESS_LEN
+            a = min(1, k / 0.12, (1 - k) / 0.12); sc = 0.7 + 0.3 * ease(k / 0.15)
+            y = HEAD + 250
+            c.save(); c.translate(W / 2, y); c.scale(sc, sc)
+            c.set_source_rgba(0.05, 0.04, 0.08, 0.75 * a); rrect(c, -400, -95, 800, 190, 36); c.fill()
+            c.restore()
+            if a > 0.3:
+                text_at(c, 'SURVIVE OR FAIL?', W / 2, y - 35, 72 * sc, rgb('#ffd36b'), lw=9)
+                text_at(c, 'COMMENT YOUR GUESS!', W / 2, y + 45, 50 * sc, (1, 1, 1), lw=8)
     def claw_pos(self, t):
         gx, gy = self.S.GRAB; ry = gy - 150
         if t < self.T_CLAW_IN: return None
@@ -230,11 +281,19 @@ def run(S, render):
     if len(sys.argv) > 3:
         want = {int(x * FPS) for x in map(float, sys.argv[3].split(','))}
         for f in range(min(N, max(want) + 1)):
-            c = cairo.Context(surf); render(f, c)
+            c = cairo.Context(surf); render(f, c); S.END.overlay(c, f / FPS)
             if f in want: surf.write_to_png(f'{out}_{f:04d}.png')
         return
     ff = subprocess.Popen(['ffmpeg', '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'bgra', '-s', f'{W}x{H}', '-r', str(FPS), '-i', '-',
                            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', out], stdin=subprocess.PIPE)
+    first = None; NL = int(LOOP_T * FPS)
     for f in range(N):
-        c = cairo.Context(surf); render(f, c); surf.flush(); ff.stdin.write(bytes(surf.get_data()))
+        c = cairo.Context(surf); render(f, c); S.END.overlay(c, f / FPS); surf.flush()
+        buf = bytes(surf.get_data())
+        if f == 0: first = np.frombuffer(buf, np.uint8).astype(np.float32)
+        if f >= N - NL:   # crossfade into frame 0 -> seamless loop
+            a = (f - (N - NL) + 1) / NL
+            cur = np.frombuffer(buf, np.uint8).astype(np.float32)
+            buf = (cur * (1 - a) + first * a).astype(np.uint8).tobytes()
+        ff.stdin.write(buf)
     ff.stdin.close(); sys.exit(ff.wait())
