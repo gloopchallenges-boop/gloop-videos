@@ -1,4 +1,5 @@
-"""2026-11-02 v1 — WHO FIRST: the GIANT FROG. Gloop (orange) and two rival blobs (blue, green) are
+"""FIXED 2026-11-03: tongue now comes out of the mouth (was the forehead), caught blobs shrink into the mouth, no strike starts in the last 0.4 s, frog aims at older positions (less sniper-like). Re-rendered with seed 8 for TikTok; the YouTube upload used the old version (seed 11).
+2026-11-02 v1 — WHO FIRST: the GIANT FROG. Gloop (orange) and two rival blobs (blue, green) are
 passive rigid balls (Ball) bouncing on a mossy log floor between two stumps; they also collide with
 each other (equal-mass elastic). A giant frog on a rock flicks its tongue at seeded-random times at
 where a random remaining blob WAS a moment ago — the tongue tip catches whoever it touches (swept).
@@ -8,14 +9,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gloop_common import *
 
 SAY = 'the giant frog'
-SEED = int(os.environ.get('SEED', 11))
+SEED = int(os.environ.get('SEED', 8))
 rng = random.Random(SEED)
 
 class S: pass
 S.HOOK2 = 'THE GIANT FROG?'; S.HOOK2_SIZE = 96; S.FAIL_WORD = 'GULP!'; S.FAIL_SIZE = 160
 S.T_START = HOOK_T; S.TL = 13.0; S.T_END = S.T_START + S.TL
 GROUND = 1610; R = 56; XMIN, XMAX = 160, 920
-MOUTH = (540, 1035); TIP_R = 36; T_OUT, T_HOLD, T_BACK = 0.2, 0.06, 0.3
+MOUTH = (540, 1112); TIP_R = 36; T_OUT, T_HOLD, T_BACK = 0.2, 0.06, 0.3
 NAMES = ['GLOOP', 'BLIP', 'MOSSY']
 SKINS = [('#ffd36b', '#ff8a1f', '#c45a00'), ('#9fd8ff', '#3c8ee0', '#1f4f8a'), ('#c6f08a', '#5fb33c', '#2f6b1f')]
 
@@ -23,7 +24,7 @@ TER = Terrain(GROUND, seed=SEED, bumps=4, amp=10, soft=False)
 xs0 = rng.sample([250, 420, 600, 780], 3)
 balls = [Ball(xs0[i], TER, R=R, seed=SEED * 3 + i, xmin=XMIN, xmax=XMAX, hop=rng.uniform(220, 300)) for i in range(3)]
 STR = []; t = 0.45
-while t < S.T_END + 1:
+while t < S.T_END - 0.4:   # no strike starts in the last 0.4 s (it couldn't finish before TIME)
     STR.append({'t': t}); t += rng.uniform(1.2, 2.1)
 N0 = int(40 * FPS); POS = [], ; POS = []; EATEN_AT = [None, None, None]; T_FAIL = None; HIST = []
 caught = {}   # blob -> strike index
@@ -44,7 +45,7 @@ for f in range(N0):
             if s['t'] < S.T_START or not alive or T_FAIL is not None:
                 s['tx'], s['ty'], s['who'] = rng.choice((XMIN + 20, XMAX - 20)), GROUND - 40, None
             else:
-                w = rng.choice(alive); lag = int(rng.uniform(0.18, 0.35) * FPS)
+                w = rng.choice(alive); lag = int(rng.uniform(0.3, 0.55) * FPS)
                 px, py = HIST[max(0, f - lag)][w]; s['tx'], s['ty'], s['who'] = px, py, w
     for i, b in enumerate(balls):
         if EATEN_AT[i] is None and i not in caught: b.step(t)
@@ -189,7 +190,7 @@ def render(f, c):
         for s in STR:   # being reeled in
             if s.get('got') == i and s['tcatch'] <= t:
                 tip = tongue_tip(s, t)
-                if tip: x, y = tip[0], tip[1]
+                if tip: x, y = tip[0], tip[1]; s['_sc'] = clamp(math.hypot(x - MOUTH[0], y - MOUTH[1]) / 220, 0.25, 1)
         if i == 0 and SPIT_T and t >= SPIT_T:
             k = clamp((t - SPIT_T) / 0.5, 0, 1); x = lerp(MOUTH[0], S.GRAB[0], k); y = lerp(MOUTH[1], S.GRAB[1], k) - 260 * math.sin(math.pi * k)
             if t >= END.T_GRAB: x, y = S.GRAB
@@ -206,7 +207,10 @@ def render(f, c):
                 c.set_source_rgba(0.6, 0.85, 0.3, 0.7)
                 for j in range(3): c.arc(x - 30 + j * 30, y + R * 0.8 + 10 * ((t * 1.5 + j * 0.3) % 1), 6, 0, 2 * math.pi); c.fill()
         else:
-            draw_blob(c, t + i, x, y, 'scared' if danger else 'worried', 0, R=R, skin=SKINS[i], sweat=False)
+            sc = 1.0
+            for s in STR:
+                if s.get('got') == i and s['tcatch'] <= t: sc = s.get('_sc', 1.0)
+            draw_blob(c, t + i, x, y, 'scared' if danger else 'worried', 0, R=R * sc, skin=SKINS[i], sweat=False)
     END.draw_claw(c, t)
     c.restore()
     END.header(c, t, fi)
