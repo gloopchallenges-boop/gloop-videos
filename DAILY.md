@@ -5,6 +5,31 @@ scenario ("Gloop daily YouTube upload", runs 12:00 Europe/Warsaw) downloads them
 `raw.githubusercontent.com` and uploads them to the Gloop YouTube channel.
 **Never edit the Make scenario from the daily job.** Only produce files.
 
+## ARENA generator (default for every normal / launch-period day)
+
+All non-special-day videos are made by one command — no hand-written scenarios any more:
+
+```
+pip install --break-system-packages -q pycairo kokoro-onnx soundfile numpy   # + /tmp/tts kokoro files (see "How to build" step 1)
+python3 engine/gloop_daily.py            # today (Warsaw), count from "How many videos", 2 renders in parallel
+```
+
+What it does (code: `engine/gloop_daily.py` + `engine/scenarios/gloop_arena.py`, on top of `gloop_common.py`):
+- Per video picks an **arena** (8: neon_lab, lava_forge, ice_cave, jungle_temple, space_dock, factory,
+  candy_box, desert_ruins — each its own floor shape, walls and colours) and **1–2 hazards** (8: saws, lasers,
+  spikes, crusher (shrinking spiked walls), blocks, lava (lava waves), spikeballs (other bouncing balls),
+  cannons). Never repeats an arena+hazard combo within 14 days (`engine/combo_history.json`), different arena
+  per video within a day, least-recently-used hazards first. Hazards ramp up (speed/rate/count) over the timer.
+- Gloop = the usual passive `Ball` (real gravity/bounces, hits are real momentum transfer), 3 hearts, timer
+  12–16 s. The claw drops him at frame 0 and carries him back to that same spot at the end → seamless loop.
+- **Seed search:** each video simulates up to 1400 seeds × difficulties headless (~1 min) and renders only the
+  best run: danger in frame 1, ≥3 real near-misses (hazard within 60 px, no contact), outcome open until the
+  last 3 s (fails lose the last heart in the last 3 s; wins have a hit/near-miss in the last 3 s), ~60 % wins.
+- Writes `queue/<date>/vN.mp4`, `meta.json` (adds `pinnedComment`), `vN.json`, `vN_tiktok.txt`, the scenario
+  file `engine/scenarios/<date>_vN.py`, `history.md` rows and `engine/combo_history.json`.
+Then (old queue days are pruned by the script): commit + push to main, check `git ls-remote origin main`.
+Special days (below) still use the hand-made themed flow.
+
 ## How many videos
 
 - **Normal day: 3 videos** (minimum 3, never fewer unless something is broken).
@@ -54,10 +79,13 @@ queue/YYYY-MM-DD/meta.json
   ...
 ]}
 ```
-- `title`: max 100 chars, no `<` or `>`, ends with `#shorts`.
-- `description`: hook line, "New Gloop challenges every day!",
-  "See you next challenge 👋", then 6–8 hashtags incl. #shorts #gloop #survival #challenge
-  (plus occasion hashtags on special days).
+- ARENA videos: `title` = question from the day's hazards + timer, max 60 chars, e.g.
+  `Can Gloop survive 14 seconds of saws and lasers?`; `description` = 1 line + 5 hashtags
+  (#shorts #physics #simulation #satisfying + hazard tag); `pinnedComment` =
+  `What should Gloop survive next? 👇` (Make ignores unknown fields; pin it by hand or via a Make module).
+- Special-day videos: `title` max 100 chars, no `<` or `>`, ends with `#shorts`; `description`: hook line,
+  "New Gloop challenges every day!", "See you next challenge 👋", then 6–8 hashtags incl. #shorts #gloop
+  #survival #challenge plus occasion hashtags.
 - `publishAt`: Warsaw time with correct offset (`TZ=Europe/Warsaw date +%:z`).
   Post when people watch most (covers EU lunch + evening and the US afternoon/evening):
   - Normal weekday: `12:00`, `18:00`, `21:00`.
