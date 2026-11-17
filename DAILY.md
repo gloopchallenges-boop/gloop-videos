@@ -54,10 +54,27 @@ queue/YYYY-MM-DD/meta.json
   ...
 ]}
 ```
-- `title`: max 100 chars, no `<` or `>`, ends with `#shorts`.
-- `description`: hook line, "New Gloop challenges every day!",
-  "See you next challenge 👋", then 6–8 hashtags incl. #shorts #gloop #survival #challenge
-  (plus occasion hashtags on special days).
+- `title`: max 100 chars, no `<` or `>`, ends with `#shorts`. Follow the **title test** below.
+- `description`: hook line (always the classic `Will Gloop survive <the threat>? <emoji>`, so search
+  still matches), "New Gloop challenges every day!", "See you next challenge 👋", then **exactly 4
+  hashtags**: `#shorts #gloop #survival` + one about the threat (e.g. `#cat`, `#whale`, `#eel`).
+  On special days swap the threat tag for the occasion tag (e.g. `#halloween`).
+
+### Title test (2026-11-18 → 2026-11-24, then review)
+
+Every title used to be `Will Gloop survive the X?` — in the feed they all look the same. For one
+week, mix in curiosity titles and compare views in YouTube Studio afterwards.
+- **Each normal day: 1–2 of the 3 videos get a CURIOSITY title, the rest keep the CLASSIC title.**
+  Alternate which slot (12:00 / 18:00 / 21:00) gets which style so time of day doesn't skew results.
+- Curiosity titles must **never give away the outcome** (no "Gloop fails", "he made it"). Make them
+  about the moment/threat, specific to that video. Max 1 "Don't …" title per day. Examples:
+  `This cat woke up at the worst moment 😳`, `Don't watch till the end 😳`, `Don't blink 👀`,
+  `Nobody expected the whale to do this 🐳`, `You won't guess who gets eaten first 🌊`,
+  `Only 1 blob made it out 🌊` (only if true and not about Gloop), `Wait for the last second…`.
+- Write the style in history.md's Title cell by prefixing `[C]` (curiosity) or `[K]` (classic),
+  e.g. `[C] This cat woke up at the worst moment 😳`.
+- **After 2026-11-24** (first run on/after 2026-11-25): keep this mix unless the user has said
+  otherwise. The user compares views in YouTube Studio and decides whether to keep or revert.
 - `publishAt`: Warsaw time with correct offset (`TZ=Europe/Warsaw date +%:z`).
   Post when people watch most (covers EU lunch + evening and the US afternoon/evening):
   - Normal weekday: `12:00`, `18:00`, `21:00`.
