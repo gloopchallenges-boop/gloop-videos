@@ -75,6 +75,37 @@ week, mix in curiosity titles and compare views in YouTube Studio afterwards.
   e.g. `[C] This cat woke up at the worst moment 😳`.
 - **After 2026-11-24** (first run on/after 2026-11-25): keep this mix unless the user has said
   otherwise. The user compares views in YouTube Studio and decides whether to keep or revert.
+
+### Style test (2026-11-18 → 2026-11-24, then review) — 1 of the 3 videos per day
+
+Studio data (Nov 17): ~22K viewers/month, 84% avg viewed, but only 40 subs and **0% returning
+viewers**. Top videos were WHO FIRST (anteater, pelican) and ITEMS LEFT (electric eel / ducks).
+Niche outliers all use a rule+question card, colored keywords, a live counter, bright colorful scenes.
+
+**Every normal day:**
+- **At least 1 of the 3 videos is WHO FIRST or ITEMS LEFT** (our proven formats). Other type-variety
+  rules still apply (no same type twice in a row; favour least-recently-used for the other slots).
+- **Exactly 1 video is the STYLE-TEST video** (rotate its slot 12:00 → 18:00 → 21:00 day by day;
+  make it the WHO FIRST / ITEMS LEFT video about every other day). It gets ALL of:
+  1. **Rule + question card** — set `S.CARD = ['<rule>', '<question>']` (engine draws it under the
+     header for the whole video; `*WORD*` = colored keyword, `*WORD|#hex*` = forced color, `S.CARD_SIZE`
+     if a line is too wide — check the stills). Short, concrete, no spoilers. Examples:
+     `['Every bounce makes *NOISE*', 'Will the cat *WAKE UP*?']`,
+     `['The eel grabs one blob at a time', 'Pick one: *ORANGE|#ff8a1f*, *BLUE|#4a90d0* or *PINK|#e070a0*?']`
+     (WHO FIRST always uses the "Pick one" question), `['Every dunk *SINKS* a duck', 'Will *1* be left?']`.
+  2. **Survival streak badge** — `S.STREAK = N`, where N = number of consecutive `Survived` outcomes
+     at the bottom of history.md in posting order, counting today's earlier-slot videos too
+     (a fail resets to 0; the badge shows the streak going INTO this video).
+  3. **Subscribe outro** — `S.CTA = True` (header says `SURVIVE TOMORROW?` / `SUBSCRIBE!`; voice line
+     unchanged).
+  4. **Brighter, colorful scene** — this video only overrides the "dark night palette" rule: daytime
+     or dusk, saturated flat colors (sky blues, pastel pinks/greens, warm sand), colorful threat and
+     props with clear shapes. Still flat & minimal, no glows. Gloop must stay the brightest/most
+     orange thing — avoid orange/yellow backgrounds behind him. Header stays dark.
+  5. **Story-style curiosity title** (counts as that day's curiosity title for the title test), e.g.
+     `That eel had one job 😳`, `The cat only needed one more squeak…`, `Every duck counted 🦆`.
+- Mark it in history.md by adding `[STYLE]` after the `[C]`/`[K]` tag in the Title cell.
+- The other 2 videos stay in the normal style (no CARD/STREAK/CTA) as the comparison group.
 - `publishAt`: Warsaw time with correct offset (`TZ=Europe/Warsaw date +%:z`).
   Post when people watch most (covers EU lunch + evening and the US afternoon/evening):
   - Normal weekday: `12:00`, `18:00`, `21:00`.

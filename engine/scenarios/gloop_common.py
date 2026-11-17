@@ -350,8 +350,41 @@ class Ending:
         g0 = S.T_START + GUESS_AT
         self.T_GUESS = g0 if S.T_RES > g0 + GUESS_LEN + 0.6 else None
     def overlay(self, c, t):
-        """Hook for frame-wide overlays. Intentionally empty: flat minimal style, no badge/prompt."""
-        return
+        """Optional STYLE-TEST overlays (see DAILY.md "Style test"). All off unless the scenario sets:
+        S.CARD   = ['rule line', 'question line']  rule+question card under the header, *word* = colored keyword
+                   (*word|#ff8a1f* forces a color), S.CARD_SIZE = font size (default 50)
+        S.CTA    = True  outro header says SURVIVE TOMORROW? / SUBSCRIBE! instead of SEE YOU NEXT CHALLENGE!
+        S.STREAK = int   Gloop's survival streak badge (top-right of the scene) while the challenge runs"""
+        S = self.S
+        card = getattr(S, 'CARD', None)
+        if card and t < self.T_OUTRO:
+            k = ease(t / 0.3)
+            c.save(); c.set_source_rgba(0.05, 0.04, 0.08, 0.82 * k); rrect(c, 40, HEAD + 14, W - 80, 64 * len(card) + 30, 26); c.fill()
+            cols = [rgb('#ffd36b'), rgb('#6be0ff'), rgb('#ff7ab0'), rgb('#7dff8a')]; ci = 0
+            for li, line in enumerate(card):
+                size = getattr(S, 'CARD_SIZE', 50); font(c, size)
+                parts = line.split('*'); fixed = {}
+                for pi_ in range(1, len(parts), 2):   # *WORD|#hex* = keyword with an explicit color
+                    if '|' in parts[pi_]: parts[pi_], hx = parts[pi_].split('|', 1); fixed[pi_] = rgb(hx)
+                widths = [c.text_extents(pt).x_advance for pt in parts]
+                x = W / 2 - sum(widths) / 2; y = HEAD + 14 + 15 + 64 * li + 48
+                for pi_, pt in enumerate(parts):
+                    col = (1, 1, 1)
+                    if pi_ % 2 == 1: col = fixed.get(pi_, cols[ci % len(cols)]); ci += 1
+                    c.move_to(x, y); c.text_path(pt); c.set_line_join(cairo.LINE_JOIN_ROUND)
+                    c.set_source_rgba(0, 0, 0, k); c.set_line_width(7); c.stroke_preserve()
+                    c.set_source_rgba(*col, k); c.fill(); x += widths[pi_]
+            c.restore()
+        st = getattr(S, 'STREAK', None)
+        if st is not None and S.T_START <= t < S.T_RES + 0.7:
+            y0 = HEAD + 14 + (64 * len(card) + 30 + 14 if card else 0)
+            c.save(); c.set_source_rgba(0.05, 0.04, 0.08, 0.8); rrect(c, W - 330, y0, 290, 74, 22); c.fill()
+            fx, fy = W - 292, y0 + 38   # flat flame
+            c.set_source_rgb(*rgb('#ff8a1f')); c.move_to(fx, fy - 30); c.curve_to(fx + 26, fy - 6, fx + 22, fy + 26, fx, fy + 28)
+            c.curve_to(fx - 22, fy + 26, fx - 26, fy - 2, fx - 8, fy - 14); c.curve_to(fx - 6, fy - 4, fx, fy - 6, fx, fy - 30); c.fill()
+            c.set_source_rgb(*rgb('#ffd36b')); c.move_to(fx, fy - 4); c.curve_to(fx + 12, fy + 8, fx + 10, fy + 24, fx, fy + 24); c.curve_to(fx - 10, fy + 24, fx - 12, fy + 8, fx, fy - 4); c.fill()
+            c.restore()
+            text_at(c, f'STREAK {st}', W - 165, y0 + 38, 44, (1, 1, 1), lw=7)
     def claw_pos(self, t):
         gx, gy = self.S.GRAB; ry = gy - 150
         if t < self.T_CLAW_IN: return None
@@ -388,6 +421,9 @@ class Ending:
             return
         if t >= self.T_OUTRO:
             k = ease((t - self.T_OUTRO) / 0.25)
+            if getattr(S, 'CTA', False):   # style test: ask for the subscribe (voice line stays the same)
+                text_center(c, 'SURVIVE TOMORROW?', 135, 84, (1, 1, 1), 0.6 + 0.4 * k)
+                text_center(c, 'SUBSCRIBE!', 240, 100, rgb('#ffd36b'), 0.6 + 0.4 * k); return
             text_center(c, 'SEE YOU NEXT', 135, 84, (1, 1, 1), 0.6 + 0.4 * k)
             text_center(c, 'CHALLENGE!', 240, 100, rgb('#ffd36b'), 0.6 + 0.4 * k); return
         if t >= S.T_RES:
