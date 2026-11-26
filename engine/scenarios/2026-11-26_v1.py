@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gloop_common import *
 
 SAY = 'the steam train'
-SEED = int(os.environ.get('SEED', 1))
+SEED = int(os.environ.get('SEED', 29))
 rng = random.Random(SEED)
 
 class S: pass

@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gloop_common import *
 
 SAY = 'the zookeeper'
-SEED = int(os.environ.get('SEED', 8))
+SEED = int(os.environ.get('SEED', 12))
 rng = random.Random(SEED)
 
 class S: pass
